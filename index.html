@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Ellie's Drawing Ranch</title>
+  <meta name="description" content="A little drawing studio made just for Ellie.">
+  <meta name="theme-color" content="#7CCBFF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Ellie Draws">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    /* ====== Grown-up settings — change these freely ====== */
+    window.ELLIE_CONFIG = {
+      name: 'Ellie',          // the artist's name, shown and spoken everywhere
+      defaultLang: 'en',      // 'en' or 'fr' on the very first visit
+      avatarImage: '',        // optional: e.g. 'img/ellie.png' to replace the drawn cartoon
+      fullscreen: true        // go full screen when she taps "Let's go!" (tablets)
+    };
+  </script>
+</head>
+<body data-theme="ranch">
+  <div id="scene" class="scene" aria-hidden="true"></div>
+
+  <!-- ============ SPLASH ============ -->
+  <section id="splash" class="screen active">
+    <div class="splash-card">
+      <div class="splash-art" id="splashArt"></div>
+      <h1 class="title"><span data-t="title1"></span> <span class="t2" data-t="title2"></span></h1>
+      <button class="big-go" id="goBtn"><span class="go-tri">▶</span> <span data-t="letsGo"></span></button>
+    </div>
+  </section>
+
+  <!-- ============ HOME ============ -->
+  <section id="home" class="screen">
+    <header class="home-top">
+      <div class="lang" id="langToggle">
+        <button data-lang="en">EN</button><button data-lang="fr">FR</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="ibtn" id="soundBtn" aria-label="sound">🔊</button>
+      <button class="ibtn pill" id="stickerBtn" aria-label="stickers">⭐ <b id="stickerNum">0</b></button>
+      <button class="ibtn" id="galleryBtn" aria-label="gallery">🖼️</button>
+      <button class="ibtn hold" id="parentBtn" aria-label="grown-ups">⚙️<i class="hold-fill"></i></button>
+    </header>
+    <div class="home-main">
+      <div class="hero">
+        <div class="bubble" id="bubble"></div>
+        <div class="ellie-wrap" id="ellieWrap"></div>
+        <div class="pony-wrap" id="ponyWrap"></div>
+      </div>
+      <div class="menu">
+        <h1 class="title"><span data-t="title1"></span> <span class="t2" data-t="title2"></span></h1>
+        <div class="tiles">
+          <button class="tile t-draw" data-act="draw"><span class="ti">🖍️</span><span data-t="act_draw"></span></button>
+          <button class="tile t-color" data-act="color"><span class="ti">🎨</span><span data-t="act_color"></span></button>
+          <button class="tile t-dots" data-act="dots"><span class="ti">
+            <svg viewBox="0 0 60 48" width="1.4em" height="1.1em"><path d="M8 40L22 10L40 30L54 8" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="1 8"/><g fill="#fff"><circle cx="8" cy="40" r="6"/><circle cx="22" cy="10" r="6"/><circle cx="40" cy="30" r="6"/><circle cx="54" cy="8" r="6"/></g></svg>
+          </span><span data-t="act_dots"></span></button>
+          <button class="tile t-lesson" data-act="lesson"><span class="ti">✏️</span><span data-t="act_lesson"></span></button>
+          <button class="tile t-spin" data-act="spin"><span class="ti">🎲</span><span data-t="act_spin"></span></button>
+        </div>
+        <div class="pickers">
+          <div class="pick-group"><span class="pick-label" data-t="themes"></span><div id="themeBtns" class="theme-btns"></div></div>
+          <div class="pick-group"><span class="pick-label" data-t="level"></span><div id="levelBtns" class="level-btns"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PICKER (coloring pages / dots / lessons) ============ -->
+  <section id="picker" class="screen">
+    <header class="bar">
+      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <h2 class="bar-title" id="pickerTitle"></h2>
+      <button class="ibtn" id="pickerSay" aria-label="say">🔊</button>
+    </header>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <!-- ============ WORK (the drawing screen) ============ -->
+  <section id="work" class="screen" data-mode="draw">
+    <header class="bar work-bar">
+      <button class="ibtn face-btn" id="workHome" aria-label="home"></button>
+      <div class="banner" id="banner"><span class="b-emoji" id="bannerEmoji"></span><span class="b-text" id="bannerText"></span></div>
+      <button class="ibtn" id="sayBtn" aria-label="say">🔊</button>
+      <button class="ibtn act" id="undoBtn"><span>↩️</span><small data-t="undo"></small></button>
+      <button class="ibtn act" id="clearBtn"><span>🧹</span><small data-t="clear"></small></button>
+      <button class="ibtn act save" id="saveBtn"><span>⭐</span><small data-t="save"></small></button>
+    </header>
+    <div class="work-body">
+      <div class="palette" id="palette"></div>
+      <div class="stage-wrap" id="stageWrap">
+        <div class="stage" id="stage">
+          <canvas id="paint" width="1200" height="900"></canvas>
+          <canvas id="lineart" width="1200" height="900"></canvas>
+          <svg id="overlay" viewBox="0 0 1200 900" preserveAspectRatio="none"></svg>
+          <div id="guideCrayon" class="guide-crayon hidden">🖍️</div>
+          <div class="stage-btns">
+            <button id="prevStep" class="round-btn small" aria-label="back">⬅</button>
+            <div id="stepDots" class="step-dots"></div>
+            <button id="nextStep" class="round-btn go" aria-label="next">➜</button>
+          </div>
+          <button id="colorItBtn" class="pill-btn go colorit hidden">🎨 <span data-t="colorIt"></span></button>
+        </div>
+      </div>
+      <div class="tools" id="tools"></div>
+    </div>
+    <div class="tray hidden" id="stampTray"></div>
+  </section>
+
+  <!-- ============ SURPRISE SPINNER ============ -->
+  <section id="spin" class="screen">
+    <header class="bar">
+      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <h2 class="bar-title" data-t="spinTitle"></h2>
+      <button class="ibtn" id="spinSay" aria-label="say">🔊</button>
+    </header>
+    <div class="spin-body">
+      <div class="reels" id="reels"></div>
+      <div class="spin-sentence" id="spinSentence"></div>
+      <div class="spin-actions">
+        <button id="spinBtn" class="pill-btn big">🎲 <span data-t="spin"></span></button>
+        <button id="drawItBtn" class="pill-btn go big hidden">🖍️ <span data-t="drawIt"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GALLERY ============ -->
+  <section id="gallery" class="screen">
+    <header class="bar">
+      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <h2 class="bar-title" data-t="gallery"></h2>
+      <span class="ibtn ghost"></span>
+    </header>
+    <div class="gallery-grid" id="galleryGrid"></div>
+  </section>
+
+  <!-- ============ STICKER BOOK ============ -->
+  <section id="stickers" class="screen">
+    <header class="bar">
+      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <h2 class="bar-title"><span data-t="stickers"></span> · <small id="stickerCount"></small></h2>
+      <span class="ibtn ghost"></span>
+    </header>
+    <div class="sticker-grid" id="stickerGrid"></div>
+  </section>
+
+  <div id="modal" class="modal hidden"><div class="modal-card" id="modalCard"></div></div>
+  <canvas id="fx"></canvas>
+  <div id="toast" class="toast"></div>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
