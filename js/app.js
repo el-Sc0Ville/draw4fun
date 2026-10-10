@@ -54,6 +54,20 @@
   const LW = [9, 7, 5.5];
   const SIZES = [8, 18, 34], STAMP_SIZES = [70, 110, 160];
   const TOOLS = ['crayon', 'brush', 'rainbow', 'sparkle', 'stamp', 'fill', 'eraser'];
+  // all step-by-step drawings (paper library + the original on-tablet lessons)
+  const LESSONS = (() => {
+    const P = window.PAPER || { lessons: {}, legacy: {} }, out = {};
+    Object.keys(ART.LESSONS).forEach((id) => {
+      if (P.legacy[id]) out[id] = Object.assign({}, ART.LESSONS[id], P.legacy[id], { steps: ART.LESSONS[id].steps.filter((x) => x.d.length) });
+    });
+    return Object.assign(out, P.lessons);
+  })();
+  const CAT_EMOJI = { all: '🌈', horses: '🐴', animals: '🐾', fun: '✨' };
+  const pd = (d) => (Array.isArray(d) ? d[0] : d);
+  const isK = (d) => Array.isArray(d) && d[1] === 'k';
+  const li = () => (S.lang === 'fr' ? 1 : 0);
+  function lessonName(id) { const L = LESSONS[id]; return L.name ? L.name[li()] : t('lessons.' + id); }
+  function stepText(st) { return st.t ? st.t[li()] : t('steps.' + st.k); }
 
   // ================= SOUND =================
   let AC = null;
@@ -140,6 +154,7 @@
   function show(id) {
     $$('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
     if (id !== 'work') stopLessonAnim();
+    if (id !== 'paper') { stopPaperAnim(); wakeOff(); }
     if (id === 'work') requestAnimationFrame(fitStage);
   }
   let modalT = null, modalOnClose = null;
@@ -509,15 +524,18 @@
   // ---------- saving ----------
   function getGallery() { return store.get('gallery', []); }
   function setGallery(g) { return store.set('gallery', g); }
+  function addToGallery(url) {
+    const g = getGallery(); g.unshift({ id: Date.now(), img: url });
+    while (g.length > 30) g.pop();
+    while (!setGallery(g) && g.length > 1) g.pop();
+  }
   function composite(scale) {
     const c = document.createElement('canvas'); c.width = Math.round(W * scale); c.height = Math.round(H * scale);
     const x = c.getContext('2d'); x.drawImage(paint, 0, 0, c.width, c.height); x.drawImage(lineart, 0, 0, c.width, c.height); return c;
   }
   function saveDrawing(silent) {
     let url; try { url = composite(0.75).toDataURL('image/jpeg', 0.82); } catch (e) { toast('🙈'); return; }
-    const g = getGallery(); g.unshift({ id: Date.now(), img: url });
-    while (g.length > 30) g.pop();
-    while (!setGallery(g) && g.length > 1) g.pop();
+    addToGallery(url);
     sfx.tada(); confetti(70);
     if (!silent) toast('⭐ ' + t('saved'));
     if (!WS.rewarded) { WS.rewarded = true; setTimeout(giveSticker, 700); } else say(t('saved'));
@@ -626,7 +644,7 @@
   });
 
   // ================= DRAW WITH ME (lessons) =================
-  const LS = { id: null, step: 0, raf: null, timers: [], done: false };
+  const LS = { id: null, step: 0, raf: null, timers: [], done: false, steps: [] };
   function stopLessonAnim() {
     if (LS.raf) cancelAnimationFrame(LS.raf); LS.raf = null;
     LS.timers.forEach(clearTimeout); LS.timers = [];
@@ -634,25 +652,26 @@
   }
   function startLesson(id) {
     startWork('lesson'); LS.id = id; LS.step = 0; LS.done = false;
+    LS.steps = LESSONS[id].steps.concat([{ k: 'color', d: [] }]);
     $('#nextStep').classList.remove('hidden'); renderStep();
   }
   function renderStep() {
     stopLessonAnim();
-    const L = ART.LESSONS[LS.id], st = L.steps[LS.step], n = L.steps.length;
+    const L = { emoji: LESSONS[LS.id].emoji, steps: LS.steps }, st = L.steps[LS.step], n = L.steps.length;
     overlay.innerHTML = '';
     $('#stepDots').innerHTML = L.steps.map((_, i) => `<i class="${i < LS.step ? 'done' : i === LS.step ? 'now' : ''}"></i>`).join('');
     $('#prevStep').style.visibility = LS.step > 0 ? 'visible' : 'hidden';
     $('#nextStep').textContent = LS.step === n - 1 ? '✓' : '➜';
-    const txt = t('steps.' + st.k);
+    const txt = stepText(st);
     setBanner(L.emoji, t('step', { n: LS.step + 1, total: n }) + ' · ' + txt);
     let speak = txt; if (LS.step === 0) speak += ' ' + (S.level === 3 ? t('watchIt') : t('traceIt'));
     say(speak);
     if (st.k === 'color') { WS.tool = 'fill'; renderTools(); }
     if (S.level === 1) {
-      L.steps.slice(0, LS.step).forEach((ps) => ps.d.forEach((d) => svgEl('path', { d, class: 'guide prev' }, overlay)));
+      L.steps.slice(0, LS.step).forEach((ps) => ps.d.forEach((d) => svgEl('path', { d: pd(d), class: 'guide prev' }, overlay)));
     }
     if (!st.d.length) return;
-    const paths = st.d.map((d) => svgEl('path', { d, class: 'guide' }, overlay));
+    const paths = st.d.map((d) => svgEl('path', { d: pd(d), class: 'guide' }, overlay));
     animateGuides(paths);
   }
   function animateGuides(paths) {
@@ -675,7 +694,7 @@
     if (S.level === 3) LS.timers.push(setTimeout(() => paths.forEach((p) => p.classList.add('gone')), 2200));
   }
   $('#nextStep').addEventListener('click', () => {
-    const L = ART.LESSONS[LS.id];
+    const L = { steps: LS.steps };
     if (LS.step >= L.steps.length - 1) {
       LS.done = true; stopLessonAnim(); overlay.innerHTML = ''; $('#nextStep').classList.add('hidden');
       $('#stepDots').innerHTML = L.steps.map(() => '<i class="done"></i>').join('');
@@ -686,12 +705,166 @@
   });
   $('#prevStep').addEventListener('click', () => { if (LS.step > 0) { LS.step--; sfx.undo(); $('#nextStep').classList.remove('hidden'); renderStep(); } });
 
+
+  // ================= DRAW TOGETHER (copy on paper) =================
+  const PV = { id: null, step: -1, raf: null, rewarded: false, wake: null, cache: {} };
+  const pStage = $('#paperStage'), pSvg = $('#paperSvg'), pColor = $('#paperColor'), pcx = pColor.getContext('2d');
+  function fitPaper() {
+    const wrap = $('#paperWrap'), ww = wrap.clientWidth, wh = wrap.clientHeight; if (!ww || !wh) return;
+    let w = ww, h = (w * 3) / 4; if (h > wh) { h = wh; w = (h * 4) / 3; }
+    pStage.style.width = Math.floor(w) + 'px'; pStage.style.height = Math.floor(h) + 'px';
+  }
+  window.addEventListener('resize', () => { if ($('#paper').classList.contains('active')) fitPaper(); });
+  window.addEventListener('orientationchange', () => setTimeout(fitPaper, 300));
+  function wakeOn() {
+    try { if (navigator.wakeLock && !PV.wake) navigator.wakeLock.request('screen').then((l) => { PV.wake = l; l.addEventListener('release', () => { PV.wake = null; }); }).catch(() => {}); } catch (e) { /* ignore */ }
+  }
+  function wakeOff() { try { if (PV.wake) { PV.wake.release(); PV.wake = null; } } catch (e) { /* ignore */ } }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#paper').classList.contains('active')) wakeOn(); });
+  function stopPaperAnim() { if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = null; const c = $('#paperCrayon'); if (c) c.classList.add('hidden'); }
+
+  function openPaper(id) {
+    PV.id = id; PV.step = -1; PV.rewarded = false;
+    $('#paperTitle').textContent = LESSONS[id].emoji + ' ' + lessonName(id);
+    show('paper'); wakeOn();
+    requestAnimationFrame(() => { fitPaper(); renderPaper(); });
+  }
+  function paperPath(d, cls) { return svgEl('path', { d: pd(d), class: cls + (isK(d) ? ' k' : '') }, pSvg); }
+  function setPaperText(big, small, hint) {
+    $('#paperText').innerHTML = `<b>${big}</b><span>${small}</span>${hint ? `<em>${hint}</em>` : ''}`;
+  }
+  function renderPaper() {
+    stopPaperAnim();
+    const L = LESSONS[PV.id], n = L.steps.length, s = PV.step, intro = s < 0, end = s >= n;
+    pSvg.innerHTML = ''; pColor.classList.remove('show');
+    $('#paperDots').innerHTML = L.steps.map((_, i) => `<i class="${i < s ? 'done' : i === s ? 'now' : ''}"></i>`).join('');
+    $('#paperEnd').classList.toggle('hidden', !end);
+    $('#paperNav').classList.toggle('hidden', end);
+    $('#pBack').style.visibility = intro ? 'hidden' : 'visible';
+    $('#pReplay').style.visibility = intro ? 'hidden' : 'visible';
+    $('#stepBadge').textContent = intro ? '✏️' : end ? '🎉' : String(s + 1);
+    $('#pNext').textContent = intro ? '▶' : '➜';
+    pStage.classList.toggle('intro', intro);
+    requestAnimationFrame(fitPaper);
+    if (intro) {
+      L.steps.forEach((st) => st.d.forEach((d) => paperPath(d, 'ink')));
+      const big = t('paperIntro', { thing: lessonName(PV.id) });
+      setPaperText(big, t('paperIntroSub'));
+      say(big + ' ' + t('paperIntroSub'));
+      return;
+    }
+    if (end) {
+      L.steps.forEach((st) => st.d.forEach((d) => paperPath(d, 'ink')));
+      setPaperText(t('doneDrawing'), t('colorYours'));
+      say(t('doneDrawing') + ' ' + t('colorYours'));
+      setTimeout(showColorIdea, 30);
+      if (!PV.rewarded) { PV.rewarded = true; sfx.tada(); confetti(120); setTimeout(giveSticker, 2200); }
+      return;
+    }
+    L.steps.slice(0, s).forEach((st) => st.d.forEach((d) => paperPath(d, 'ink')));
+    const fresh = L.steps[s].d.map((d) => paperPath(d, 'new'));
+    const txt = stepText(L.steps[s]);
+    setPaperText(t('stepN', { n: s + 1 }) + ' <small>/ ' + n + '</small>', txt, t('copyPink'));
+    say(s === 0 ? txt + ' ' + t('copyPink') : txt);
+    animatePaper(fresh);
+  }
+  function animatePaper(paths) {
+    const lens = paths.map((p) => { try { return p.getTotalLength() || 1; } catch (e) { return 1; } });
+    paths.forEach((p, i) => { p.style.strokeDasharray = lens[i] + ' ' + lens[i]; p.style.strokeDashoffset = lens[i]; });
+    const cr = $('#paperCrayon'); cr.classList.remove('hidden');
+    let idx = 0, t0 = null;
+    function frame(ts) {
+      if (t0 == null) t0 = ts;
+      const p = paths[idx], L = lens[idx], per = Math.max(700, L * 2.1), k = Math.min(1, (ts - t0) / per);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      p.style.strokeDashoffset = L * (1 - e);
+      try { const pt = p.getPointAtLength(L * e); cr.style.left = (pt.x / W) * 100 + '%'; cr.style.top = (pt.y / H) * 100 + '%'; } catch (er) { /* ignore */ }
+      if (k >= 1) {
+        p.style.strokeDasharray = ''; p.style.strokeDashoffset = ''; p.classList.add('filled');
+        idx++; t0 = ts;
+        if (idx >= paths.length) { cr.classList.add('hidden'); PV.raf = null; return; }
+      }
+      PV.raf = requestAnimationFrame(frame);
+    }
+    PV.raf = requestAnimationFrame(frame);
+  }
+  // paint a "color idea" by pouring colors into the closed shapes
+  function colorize(L) {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'); x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = 10; x.strokeStyle = '#000'; x.fillStyle = '#000';
+    L.steps.forEach((st) => st.d.forEach((d) => { let p; try { p = new Path2D(pd(d)); } catch (e) { return; } if (isK(d)) x.fill(p); x.stroke(p); }));
+    const src = x.getImageData(0, 0, W, H).data, N = W * H, wall = new Uint8Array(N);
+    for (let i = 0, j = 3; i < N; i++, j += 4) wall[i] = src[j] > 90 ? 1 : 0;
+    const out = x.createImageData(W, H), px = new Uint32Array(out.data.buffer), done = new Uint8Array(N);
+    const seeds = [];
+    (L.colors || []).forEach((cc) => {
+      if (cc[0] === 'grid') { for (let yy = cc[2]; yy <= cc[4]; yy += cc[5]) for (let xx = cc[1]; xx <= cc[3]; xx += cc[5]) seeds.push([xx, yy, cc[6]]); }
+      else seeds.push(cc);
+    });
+    const vis = new Uint8Array(N);
+    for (const sd of seeds) {
+      const sx = sd[0] | 0, sy = sd[1] | 0; if (sx <= 0 || sy <= 0 || sx >= W - 1 || sy >= H - 1) continue;
+      const st = sy * W + sx; if (wall[st] || done[st] || vis[st]) continue;
+      const rgb = hexRgb(sd[2]), col = ((255 << 24) | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0]) >>> 0;
+      const region = [], stack = [st]; let leak = false; vis[st] = 1;
+      while (stack.length) {
+        const i = stack.pop(); region.push(i);
+        const y = (i / W) | 0, xx = i - y * W;
+        if (xx === 0 || xx === W - 1 || y === 0 || y === H - 1) { leak = true; break; }
+        const nb = [i - 1, i + 1, i - W, i + W];
+        for (let q = 0; q < 4; q++) { const k = nb[q]; if (!vis[k] && !wall[k] && !done[k]) { vis[k] = 1; stack.push(k); } }
+      }
+      if (leak) continue; // that seed was outside the drawing: skip it
+      for (const i of region) { px[i] = col; done[i] = 1; }
+    }
+    for (let pass = 0; pass < 4; pass++) {
+      const add = [];
+      for (let i = W; i < N - W; i++) {
+        if (done[i] || !wall[i]) continue;
+        const n = done[i - 1] ? i - 1 : done[i + 1] ? i + 1 : done[i - W] ? i - W : done[i + W] ? i + W : -1;
+        if (n >= 0) add.push(i, n);
+      }
+      for (let k = 0; k < add.length; k += 2) { px[add[k]] = px[add[k + 1]]; done[add[k]] = 1; }
+    }
+    return out;
+  }
+  function showColorIdea() {
+    const L = LESSONS[PV.id]; if (!L.colors || !L.colors.length) return;
+    if (!PV.cache[PV.id]) PV.cache[PV.id] = colorize(L);
+    pcx.clearRect(0, 0, W, H); pcx.putImageData(PV.cache[PV.id], 0, 0);
+    requestAnimationFrame(() => pColor.classList.add('show'));
+  }
+  $('#pNext').addEventListener('click', () => { sfx.pick(); PV.step++; renderPaper(); });
+  $('#pBack').addEventListener('click', () => { if (PV.step > -1) { sfx.undo(); PV.step--; renderPaper(); } });
+  $('#pReplay').addEventListener('click', () => { sfx.tap(); renderPaper(); });
+  pStage.addEventListener('click', () => { if (PV.step >= 0 && PV.step < LESSONS[PV.id].steps.length) { sfx.tap(); renderPaper(); } });
+  $('#paperSay').addEventListener('click', () => say($('#paperText').textContent));
+  $('#pAgain').addEventListener('click', () => { sfx.pick(); PV.step = 0; renderPaper(); });
+  $('#pTablet').addEventListener('click', () => { sfx.pick(); startLesson(PV.id); });
+  $('#pPhoto').addEventListener('click', () => { sfx.tap(); $('#photoInput').click(); });
+  $('#photoInput').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const sc = Math.min(1, 1000 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+      c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      let data; try { data = c.toDataURL('image/jpeg', 0.8); } catch (er) { return; }
+      addToGallery(data); sfx.tada(); confetti(110); neigh();
+      openModal(`<img class="big" src="${data}" alt=""><h3>${t('photoSaved')}</h3><div class="muted">${t('tapToClose')}</div>`, { tapClose: true, auto: 6000 });
+      setTimeout(() => say(t('photoSaved')), 700);
+    };
+    im.onerror = () => URL.revokeObjectURL(url);
+    im.src = url;
+  });
+
   // ================= PICKERS =================
   function themeFirst(obj) {
     const ids = Object.keys(obj), mine = ids.filter((k) => (obj[k].themes || []).indexOf(S.theme) >= 0);
     return mine.concat(ids.filter((k) => mine.indexOf(k) < 0));
   }
-  let pickerKind = null;
+  let pickerKind = null, togetherCat = 'all';
   function card(inner, label, onClick, i) {
     const b = document.createElement('button'); b.className = 'card'; b.style.animationDelay = (i || 0) * 0.05 + 's';
     if (typeof inner === 'string') b.innerHTML = inner; else b.appendChild(inner);
@@ -720,13 +893,19 @@
         cards.appendChild(card(`<div class="mystery" style="background:${mysteryColors[j % mysteryColors.length]}">?</div>`, `<span class="badge">1 → ${n}</span>`, () => startDots(id), i++));
       });
     } else {
-      title = t('pickLesson'); const ids = themeFirst(ART.LESSONS);
-      randomCard(() => startLesson(rnd(ids)));
+      title = t('pickTogether');
+      const chips = document.createElement('div'); chips.className = 'chips';
+      chips.innerHTML = ['all', 'horses', 'animals', 'fun'].map((c) => `<button data-c="${c}" class="${c === togetherCat ? 'on' : ''}">${CAT_EMOJI[c]} ${t('cat_' + c)}</button>`).join('');
+      chips.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; togetherCat = b.dataset.c; sfx.pick(); showPicker('lesson'); });
+      cards.appendChild(chips);
+      const ids = Object.keys(LESSONS).filter((id) => togetherCat === 'all' || LESSONS[id].cat === togetherCat)
+        .sort((a, b) => (LESSONS[a].level - LESSONS[b].level) || ((LESSONS[a].cat === 'horses' ? 0 : 1) - (LESSONS[b].cat === 'horses' ? 0 : 1)));
+      randomCard(() => openPaper(rnd(ids)));
       ids.forEach((id) => {
-        const L = ART.LESSONS[id];
-        const paths = L.steps.reduce((a, s) => a.concat(s.d), []).map((d) => `<path d="${d}"/>`).join('');
-        const svg = `<div class="thumb"><svg viewBox="0 0 1200 900"><g fill="none" stroke="#3A2A4A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg></div>`;
-        cards.appendChild(card(svg, L.emoji + ' ' + t('lessons.' + id), () => startLesson(id), i++));
+        const L = LESSONS[id];
+        const paths = L.steps.reduce((a, st) => a.concat(st.d), []).map((d) => `<path d="${pd(d)}"${isK(d) ? ' fill="#3A2A4A"' : ''}/>`).join('');
+        const svg = `<div class="thumb paper-thumb"><svg viewBox="0 0 1200 900"><g fill="none" stroke="#3A2A4A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg></div>`;
+        cards.appendChild(card(svg, `${L.emoji} ${lessonName(id)}<span class="lvl">${'⭐'.repeat(L.level)}</span>`, () => openPaper(id), i++));
       });
     }
     $('#pickerTitle').textContent = title; show('picker');
@@ -869,6 +1048,7 @@
     if (act === 'draw') return startDraw();
     if (act === 'spin') return showSpin();
     showPicker(act === 'color' ? 'color' : act === 'dots' ? 'dots' : 'lesson');
+    if (act === 'together') { say(t('say_together')); return; }
     say(t('say_' + act));
   }
   $$('.tile').forEach((b) => b.addEventListener('click', () => go(b.dataset.act)));
@@ -921,5 +1101,5 @@
   })();
 
   // test hook (harmless)
-  window.__ellie = { S, WS, startDots, startLesson, startColor, startDraw, showSpin, showGallery, showStickers, showPicker, giveSticker, goHome, DS };
+  window.__ellie = { LESSONS, openPaper, PV, colorize, S, WS, startDots, startLesson, startColor, startDraw, showSpin, showGallery, showStickers, showPicker, giveSticker, goHome, DS };
 })();

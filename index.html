@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Ellie Draws">
+  <meta name="apple-mobile-web-app-title" content="draw4fun">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.png">
@@ -25,6 +25,7 @@
       avatarImage: '',        // optional: e.g. 'img/ellie.png' to replace the drawn cartoon
       fullscreen: true        // go full screen when she taps "Let's go!" (tablets)
     };
+    /* All of these are optional — the defaults above already work. */
   </script>
 </head>
 <body data-theme="ranch">
@@ -60,12 +61,12 @@
       <div class="menu">
         <h1 class="title"><span data-t="title1"></span> <span class="t2" data-t="title2"></span></h1>
         <div class="tiles">
+          <button class="tile t-together" data-act="together"><span class="ti">📝</span><span class="tt"><span data-t="act_together"></span><small data-t="act_together_sub"></small></span></button>
           <button class="tile t-draw" data-act="draw"><span class="ti">🖍️</span><span data-t="act_draw"></span></button>
           <button class="tile t-color" data-act="color"><span class="ti">🎨</span><span data-t="act_color"></span></button>
           <button class="tile t-dots" data-act="dots"><span class="ti">
             <svg viewBox="0 0 60 48" width="1.4em" height="1.1em"><path d="M8 40L22 10L40 30L54 8" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="1 8"/><g fill="#fff"><circle cx="8" cy="40" r="6"/><circle cx="22" cy="10" r="6"/><circle cx="40" cy="30" r="6"/><circle cx="54" cy="8" r="6"/></g></svg>
           </span><span data-t="act_dots"></span></button>
-          <button class="tile t-lesson" data-act="lesson"><span class="ti">✏️</span><span data-t="act_lesson"></span></button>
           <button class="tile t-spin" data-act="spin"><span class="ti">🎲</span><span data-t="act_spin"></span></button>
         </div>
         <div class="pickers">
@@ -117,6 +118,40 @@
     <div class="tray hidden" id="stampTray"></div>
   </section>
 
+  <!-- ============ DRAW TOGETHER (copy on paper) ============ -->
+  <section id="paper" class="screen">
+    <header class="bar">
+      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <h2 class="bar-title" id="paperTitle"></h2>
+      <button class="ibtn" id="paperSay" aria-label="say">🔊</button>
+    </header>
+    <div class="paper-body">
+      <div class="paper-stage-wrap" id="paperWrap">
+        <div class="paper-stage" id="paperStage">
+          <canvas id="paperColor" width="1200" height="900"></canvas>
+          <svg id="paperSvg" viewBox="0 0 1200 900" preserveAspectRatio="none"></svg>
+          <div id="paperCrayon" class="guide-crayon hidden">✏️</div>
+          <div class="step-badge" id="stepBadge">1</div>
+        </div>
+      </div>
+      <div class="paper-side">
+        <div class="paper-text" id="paperText"></div>
+        <div class="paper-dots" id="paperDots"></div>
+        <div class="paper-nav" id="paperNav">
+          <button id="pBack" class="round-btn" aria-label="back">⬅</button>
+          <button id="pReplay" class="round-btn" aria-label="watch again">↻</button>
+          <button id="pNext" class="round-btn go" aria-label="next">➜</button>
+        </div>
+        <div class="paper-end hidden" id="paperEnd">
+          <button id="pPhoto" class="pill-btn go">📷 <span data-t="showMe"></span></button>
+          <button id="pTablet" class="pill-btn">✏️ <span data-t="tryTablet"></span></button>
+          <button id="pAgain" class="pill-btn">🔁 <span data-t="startOver"></span></button>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+  </section>
+
   <!-- ============ SURPRISE SPINNER ============ -->
   <section id="spin" class="screen">
     <header class="bar">
@@ -160,6 +195,7 @@
 
   <script src="js/i18n.js"></script>
   <script src="js/art.js"></script>
+  <script src="js/paper.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

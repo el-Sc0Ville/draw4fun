@@ -1,6 +1,6 @@
 {
   "name": "Ellie's Drawing Ranch",
-  "short_name": "Ellie Draws",
+  "short_name": "draw4fun",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
