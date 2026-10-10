@@ -176,7 +176,7 @@
 
   // ---------------- FUN STUFF ----------------
   L.cupcake = {
-    name: ['Cupcake', 'Petit gâteau'], emoji: '🧁', level: 1, cat: 'fun',
+    name: ['Cupcake', 'Petit gâteau'], emoji: '🧁', level: 1, cat: 'yummy',
     steps: [
       { t: ['Draw the cup, like a bucket.', 'Dessine le moule, comme un seau.'], d: ['M420 525L482 790L718 790L780 525', 'M405 525L795 525'] },
       { t: ['Add lines on the cup.', 'Ajoute des lignes sur le moule.'], d: ['M480 528L515 788', 'M540 528L560 788', 'M600 528L600 788', 'M660 528L640 788', 'M720 528L685 788'] },
@@ -188,7 +188,7 @@
     colors: [[472, 650, '#FF6FB5'], [527, 650, '#FFC2DD'], [575, 650, '#FF6FB5'], [625, 650, '#FFC2DD'], [674, 650, '#FF6FB5'], [726, 650, '#FFC2DD'], [600, 500, '#FFD6E8'], [600, 395, '#FFB3D1'], [600, 300, '#FF8FC0']]
   };
   L.iceCream = {
-    name: ['Ice cream', 'Crème glacée'], emoji: '🍦', level: 1, cat: 'fun',
+    name: ['Ice cream', 'Crème glacée'], emoji: '🍦', level: 1, cat: 'yummy',
     steps: [
       { t: ['Draw a pointy cone.', 'Dessine un cornet pointu.'], d: ['M482 490L600 822L718 490'] },
       { t: ['Make a criss-cross pattern.', 'Fais un quadrillage en X.'], d: ['M506 556L653 673', 'M541 656L624 756', 'M694 556L547 673', 'M659 656L576 756', 'M560 492L688 573', 'M640 492L512 573'] },
@@ -200,7 +200,7 @@
     colors: [['grid', 490, 500, 710, 810, 22, '#E0A458'], [600, 450, '#FF9EC4'], [600, 300, '#B8F0D8'], [600, 228, '#E63946']]
   };
   L.flower = {
-    name: ['Flower', 'Fleur'], emoji: '🌸', level: 1, cat: 'fun',
+    name: ['Flower', 'Fleur'], emoji: '🌸', level: 1, cat: 'things',
     steps: [
       { t: ['Draw a circle in the middle.', 'Dessine un cercle au milieu.'], d: [circ(600, 300, 62)] },
       { t: ['Draw petals all around.', 'Dessine des pétales tout autour.'], d: [0, 60, 120, 180, 240, 300].map((a) => petal(600, 300, 62, a, 110)) },
@@ -213,7 +213,7 @@
       .concat([[600, 450, '#2A9D58'], [500, 606, '#8AC926'], [700, 528, '#8AC926'], [520, 790, '#E07A5F'], [600, 850, '#F4A261']])
   };
   L.train = {
-    name: ['Train', 'Train'], emoji: '🚂', level: 2, cat: 'fun',
+    name: ['Train', 'Train'], emoji: '🚂', level: 2, cat: 'things',
     steps: [
       { t: ['Draw the cabin with a roof and a window.', 'Dessine la cabine avec un toit et une fenêtre.'], d: [rr(690, 250, 270, 40, 10), 'M712 290L712 620L938 620L938 290', rr(748, 330, 144, 110, 18)] },
       { t: ['Draw a long body and a round front.', 'Dessine un long corps et un devant tout rond.'], d: ['M712 430L345 430', 'M712 620L345 620', ell(345, 525, 42, 95)] },
@@ -227,7 +227,7 @@
       [420, 640, '#FF8C42'], [545, 640, '#FF8C42'], [675, 640, '#FF8C42'], [845, 640, '#FF8C42'], [330, 690, '#E63946'], [290, 680, '#E63946']]
   };
   L.mermaid = {
-    name: ['Mermaid', 'Sirène'], emoji: '🧜', level: 3, cat: 'fun',
+    name: ['Mermaid', 'Sirène'], emoji: '🧜', level: 3, cat: 'magic',
     steps: [
       { t: ['Draw a big round head.', 'Dessine une grosse tête ronde.'], d: [ell(600, 335, 150, 140)] },
       { t: ['Draw her hair and bangs.', 'Dessine ses cheveux et sa frange.'], d: ['M440 345C430 120 770 120 760 345', 'M452 318C500 300 548 262 575 232C605 282 690 300 748 318'] },
@@ -241,7 +241,7 @@
       [530, 490, '#FFE3D3'], [600, 540, '#FFD23F'], [600, 160, '#FFD23F'], [510, 395, '#FF9EB5'], [690, 395, '#FF9EB5'], [552, 552, '#FFE3D3'], [648, 552, '#FFE3D3'], [600, 608, '#C77DFF']]
   };
   L.rocket = {
-    name: ['Rocket', 'Fusée'], emoji: '🚀', level: 2, cat: 'fun',
+    name: ['Rocket', 'Fusée'], emoji: '🚀', level: 2, cat: 'things',
     steps: [
       { t: ['Draw a tall rocket shape.', 'Dessine une grande fusée.'], d: ['M520 700L520 360C520 250 600 150 600 150C600 150 680 250 680 360L680 700Z'] },
       { t: ['Add a round window.', 'Ajoute une fenêtre ronde.'], d: [circ(600, 390, 52), circ(600, 390, 34)] },
@@ -258,7 +258,7 @@
     lessons: L,
     // extra info for the original on-tablet lessons in art.js
     legacy: {
-      fishy: { level: 1, cat: 'animals', colors: [[560, 520, '#4CC9F0'], [900, 450, '#FF8C42'], [570, 270, '#FF8C42']] }
+      fishy: { level: 1, cat: 'sea', colors: [[560, 520, '#4CC9F0'], [900, 450, '#FF8C42'], [570, 270, '#FF8C42']] }
     }
   };
 })();

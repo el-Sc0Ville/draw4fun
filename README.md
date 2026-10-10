@@ -14,15 +14,24 @@ The big purple button on the home screen. Ellie picks a drawing, grabs paper and
 
 The screen stays awake while she draws, on tablets that support it.
 
-**Library: 19 drawings**, filtered by Horses / Animals / Fun stuff, with ⭐ to ⭐⭐⭐ difficulty:
+**Library: 91 drawings**, all unlocked, with ⭐ to ⭐⭐⭐ difficulty on each card:
 
-| ⭐ Easy | ⭐⭐ Medium | ⭐⭐⭐ Tricky |
+| Category | Count | Examples |
 |---|---|---|
-| Kitty, Snail, Turtle, Fish, Cupcake, Ice cream, Flower | Pony, Seahorse, Chick, Bunny in a basket, Butterfly, Owl, Train, Rocket | Horse, Unicorn, Swan, Mermaid |
+| 🐴 Horses | 10 | horse, pony, unicorn, rocking horse, carousel horse, baby foal, seahorse, lucky horseshoe |
+| 🐾 Animals | 25 | kitty, puppy, bunny, panda, fox, lion, giraffe, penguin, cow, piggy, sheep, owl… |
+| 🐠 Sea | 13 | whale, octopus, crab, dolphin, jellyfish, friendly shark, sailboat, lighthouse… |
+| 🍓 Yummy | 14 | donut, pizza, strawberry, birthday cake, popsicle, pancakes, carrot (for the pony)… |
+| 🔮 Magic | 13 | fairy, princess, castle, baby dragon, mermaid, rainbow, friendly ghost, pumpkin… |
+| 🚗 Things | 16 | car, airplane, hot air balloon, robot, snowman, bicycle, teapot, apple tree… |
+
+**Always something fresh:**
+- **🌟 Drawing of the day.** Every day a new drawing is featured at the top of the list and on the home button ("Today: 🐧 Penguin"). It picks one she hasn't tried yet, so she'll go months without repeats. The very first one is a horse.
+- **NEW badges.** Drawings she hasn't opened yet get a pink NEW tag, and the "✨ New for you" filter shows how many are left.
 
 ### Adding more drawings
 
-All drawings live in `js/paper.js`. Each one is a block like this:
+Drawings live in `js/paper.js` and in theme packs in `js/packs/` (horsesfarm, animals, sea, yummy, magic, things). Each one is a block like this:
 
 ```js
 L.cat = {
@@ -35,7 +44,7 @@ L.cat = {
 };
 ```
 
-The drawing space is 1200 × 900 and each step's `d` is a list of SVG paths. The easiest way to get new ones: ask Claude ("add a dolphin and a dragon to paper.js").
+The drawing space is 1200 × 900 and each step's `d` is a list of SVG paths. The easiest way to get new ones is to ask Claude for a new pack ("make a winter pack", "add a dinosaur pack"). A new pack is one new file in `js/packs/` plus one `<script>` line in `index.html`, and the new drawings automatically show up with NEW badges and in the drawing of the day.
 
 ## Everything else
 
@@ -88,7 +97,8 @@ index.html            page + optional settings
 css/style.css         look & layout
 js/i18n.js            English / French text + Surprise idea lists
 js/art.js             Ellie, the pony, coloring pages, dot shapes
-js/paper.js           the "Draw together" step-by-step library  ← add drawings here
+js/paper.js           the "Draw together" core library
+js/packs/*.js         theme packs (more drawings)                 ← add new packs here
 js/app.js             drawing engine, sounds, voice, games
 icon*.png, icon.svg   home-screen icons
 manifest.webmanifest  "install as app" info

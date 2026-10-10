@@ -62,7 +62,34 @@
     });
     return Object.assign(out, P.lessons);
   })();
-  const CAT_EMOJI = { all: '🌈', horses: '🐴', animals: '🐾', fun: '✨' };
+  const CAT_EMOJI = { all: '🌈', new: '✨', horses: '🐴', animals: '🐾', sea: '🐠', yummy: '🍓', magic: '🔮', things: '🚗' };
+  const CATS = ['all', 'new', 'horses', 'animals', 'sea', 'yummy', 'magic', 'things'];
+  // ---- "seen" drawings + drawing of the day ----
+  const seen = store.get('paperSeen', {});
+  const isNew = (id) => !seen[id];
+  function markSeen(id) { if (!seen[id]) { seen[id] = Date.now(); store.set('paperSeen', seen); } }
+  const ORDER = (() => { // stable shuffled order so every day brings a different drawing
+    const ids = Object.keys(LESSONS).sort(); let seed = 20261010;
+    const r = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const x = ids[i]; ids[i] = ids[j]; ids[j] = x; }
+    const h = ids.filter((id) => LESSONS[id].cat === 'horses'); if (h.length) { ids.splice(ids.indexOf(h[0]), 1); ids.unshift(h[0]); }
+    return ids;
+  })();
+  function todayKey() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function drawingOfTheDay() {
+    const key = todayKey(), cur = store.get('dotd', null);
+    if (cur && cur.date === key && LESSONS[cur.id]) return cur.id;
+    const dayN = Math.floor(new Date(key.replace(/-/g, '/')).getTime() / 864e5);
+    let id = null;
+    if (!cur) id = ORDER.find((c) => LESSONS[c].cat === 'horses' && isNew(c)) || null; // the very first one is a horse!
+    for (let k = 0; k < ORDER.length && !id; k++) { const c = ORDER[(dayN + k) % ORDER.length]; if (isNew(c)) { id = c; break; } }
+    if (!id) id = ORDER[dayN % ORDER.length];
+    store.set('dotd', { date: key, id }); return id;
+  }
+  function updateTodayPill() {
+    const el = document.getElementById('todayPill'); if (!el) return;
+    const id = drawingOfTheDay(); el.textContent = t('act_together_sub') + ' · 🌟 ' + t('today') + ': ' + LESSONS[id].emoji + ' ' + lessonName(id);
+  }
   const pd = (d) => (Array.isArray(d) ? d[0] : d);
   const isK = (d) => Array.isArray(d) && d[1] === 'k';
   const li = () => (S.lang === 'fr' ? 1 : 0);
@@ -242,6 +269,7 @@
     $('#levelBtns').innerHTML = [1, 2, 3].map((l) =>
       `<button data-level="${l}" class="${l === S.level ? 'on' : ''}"><span class="stars">${'⭐'.repeat(l)}</span>${t('lv' + l)}</button>`).join('');
     updateStickerNum();
+    if (typeof updateTodayPill === 'function') updateTodayPill();
   }
   function setBubble(text) { const b = $('#bubble'); b.textContent = text; b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; }
   function updateStickerNum() { $('#stickerNum').textContent = Object.keys(S.stickers).length; }
@@ -724,7 +752,7 @@
   function stopPaperAnim() { if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = null; const c = $('#paperCrayon'); if (c) c.classList.add('hidden'); }
 
   function openPaper(id) {
-    PV.id = id; PV.step = -1; PV.rewarded = false;
+    PV.id = id; PV.step = -1; PV.rewarded = false; markSeen(id);
     $('#paperTitle').textContent = LESSONS[id].emoji + ' ' + lessonName(id);
     show('paper'); wakeOn();
     requestAnimationFrame(() => { fitPaper(); renderPaper(); });
@@ -864,9 +892,9 @@
     const ids = Object.keys(obj), mine = ids.filter((k) => (obj[k].themes || []).indexOf(S.theme) >= 0);
     return mine.concat(ids.filter((k) => mine.indexOf(k) < 0));
   }
-  let pickerKind = null, togetherCat = 'all';
+  let pickerKind = null, togetherCat = 'all', pickerToken = 0;
   function card(inner, label, onClick, i) {
-    const b = document.createElement('button'); b.className = 'card'; b.style.animationDelay = (i || 0) * 0.05 + 's';
+    const b = document.createElement('button'); b.className = 'card'; b.style.animationDelay = Math.min(i || 0, 14) * 0.04 + 's';
     if (typeof inner === 'string') b.innerHTML = inner; else b.appendChild(inner);
     const l = document.createElement('span'); l.innerHTML = label; b.appendChild(l);
     b.addEventListener('click', () => { sfx.pick(); onClick(); });
@@ -874,7 +902,7 @@
   }
   const mysteryColors = ['#FF6B6B', '#FFB703', '#4CC9F0', '#8AC926', '#9B5DE5', '#FF6FB5', '#FF8C42', '#2EC4B6'];
   function showPicker(kind) {
-    pickerKind = kind; const cards = $('#cards'); cards.innerHTML = ''; let title = '', i = 0;
+    pickerKind = kind; pickerToken++; const cards = $('#cards'); cards.innerHTML = ''; let title = '', i = 0;
     const randomCard = (fn) => cards.appendChild(card('<div class="mystery" style="background:linear-gradient(135deg,#FF6B6B,#FFD23F,#4CC9F0,#9B5DE5)">🎲</div>', t('random'), fn, i++));
     if (kind === 'color') {
       title = t('pickPage'); const ids = themeFirst(ART.PAGES);
@@ -894,19 +922,41 @@
       });
     } else {
       title = t('pickTogether');
-      const chips = document.createElement('div'); chips.className = 'chips';
-      chips.innerHTML = ['all', 'horses', 'animals', 'fun'].map((c) => `<button data-c="${c}" class="${c === togetherCat ? 'on' : ''}">${CAT_EMOJI[c]} ${t('cat_' + c)}</button>`).join('');
-      chips.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; togetherCat = b.dataset.c; sfx.pick(); showPicker('lesson'); });
-      cards.appendChild(chips);
-      const ids = Object.keys(LESSONS).filter((id) => togetherCat === 'all' || LESSONS[id].cat === togetherCat)
-        .sort((a, b) => (LESSONS[a].level - LESSONS[b].level) || ((LESSONS[a].cat === 'horses' ? 0 : 1) - (LESSONS[b].cat === 'horses' ? 0 : 1)));
-      randomCard(() => openPaper(rnd(ids)));
-      ids.forEach((id) => {
+      const thumb = (id, big) => {
         const L = LESSONS[id];
         const paths = L.steps.reduce((a, st) => a.concat(st.d), []).map((d) => `<path d="${pd(d)}"${isK(d) ? ' fill="#3A2A4A"' : ''}/>`).join('');
-        const svg = `<div class="thumb paper-thumb"><svg viewBox="0 0 1200 900"><g fill="none" stroke="#3A2A4A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg></div>`;
-        cards.appendChild(card(svg, `${L.emoji} ${lessonName(id)}<span class="lvl">${'⭐'.repeat(L.level)}</span>`, () => openPaper(id), i++));
-      });
+        return `<div class="thumb paper-thumb${big ? ' big' : ''}">${isNew(id) ? `<b class="new-badge">${t('newBadge')}</b>` : ''}<svg viewBox="0 0 1200 900"><g fill="none" stroke="#3A2A4A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg></div>`;
+      };
+      // today's drawing, featured
+      const tid = drawingOfTheDay(), TL = LESSONS[tid];
+      const feat = card(thumb(tid, true), `<span class="today-tag">🌟 ${t('todayTitle')}</span>${TL.emoji} ${lessonName(tid)}<span class="lvl">${'⭐'.repeat(TL.level)}</span>`, () => openPaper(tid), 0);
+      feat.classList.add('today-card'); cards.appendChild(feat);
+      const chips = document.createElement('div'); chips.className = 'chips';
+      chips.innerHTML = CATS.map((c) => {
+        const n = c === 'new' ? Object.keys(LESSONS).filter(isNew).length : 0;
+        return `<button data-c="${c}" class="${c === togetherCat ? 'on' : ''}">${CAT_EMOJI[c]} ${t('cat_' + c)}${c === 'new' ? ` <i>${n}</i>` : ''}</button>`;
+      }).join('');
+      chips.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; togetherCat = b.dataset.c; sfx.pick(); showPicker('lesson'); });
+      cards.appendChild(chips);
+      const ids = Object.keys(LESSONS).filter((id) => togetherCat === 'all' || (togetherCat === 'new' ? isNew(id) : LESSONS[id].cat === togetherCat))
+        .sort((a, b) => ((isNew(a) ? 0 : 1) - (isNew(b) ? 0 : 1)) || (LESSONS[a].level - LESSONS[b].level) || ((LESSONS[a].cat === 'horses' ? 0 : 1) - (LESSONS[b].cat === 'horses' ? 0 : 1)));
+      if (!ids.length) {
+        const e = document.createElement('div'); e.className = 'empty'; e.textContent = '🏆 ' + t('allTried'); cards.appendChild(e);
+      } else {
+        randomCard(() => openPaper(rnd(ids)));
+        const token = ++pickerToken; let k = 0;
+        const batch = () => { // first cards now, the rest in quick batches (keeps slower tablets snappy)
+          if (token !== pickerToken) return;
+          const frag = document.createDocumentFragment();
+          for (let n = 0; n < (k === 0 ? 10 : 16) && k < ids.length; n++, k++) {
+            const id = ids[k], L = LESSONS[id];
+            frag.appendChild(card(thumb(id), `${L.emoji} ${lessonName(id)}<span class="lvl">${'⭐'.repeat(L.level)}</span>`, () => openPaper(id), i++));
+          }
+          cards.appendChild(frag);
+          if (k < ids.length) setTimeout(batch, 16);
+        };
+        batch();
+      }
     }
     $('#pickerTitle').textContent = title; show('picker');
   }
@@ -1041,14 +1091,14 @@
   function updateSoundBtn() { $('#soundBtn').textContent = S.sound ? '🔊' : '🔇'; }
 
   // ================= HOME =================
-  function goHome() { hush(); stopLessonAnim(); show('home'); setBubble(t('hello')); }
+  function goHome() { hush(); stopLessonAnim(); show('home'); setBubble(t('hello')); updateTodayPill(); }
   function startDraw() { startWork('draw'); setBanner('🖍️', t('say_draw')); say(t('say_draw')); }
   function go(act) {
     sfx.tap();
     if (act === 'draw') return startDraw();
     if (act === 'spin') return showSpin();
     showPicker(act === 'color' ? 'color' : act === 'dots' ? 'dots' : 'lesson');
-    if (act === 'together') { say(t('say_together')); return; }
+    if (act === 'together') { const id = drawingOfTheDay(); say(t('say_together') + ' ' + t('todaySay', { thing: lessonName(id) })); return; }
     say(t('say_' + act));
   }
   $$('.tile').forEach((b) => b.addEventListener('click', () => go(b.dataset.act)));
@@ -1101,5 +1151,5 @@
   })();
 
   // test hook (harmless)
-  window.__ellie = { LESSONS, openPaper, PV, colorize, S, WS, startDots, startLesson, startColor, startDraw, showSpin, showGallery, showStickers, showPicker, giveSticker, goHome, DS };
+  window.__ellie = { drawingOfTheDay, ORDER, seen, LESSONS, openPaper, PV, colorize, S, WS, startDots, startLesson, startColor, startDraw, showSpin, showGallery, showStickers, showPicker, giveSticker, goHome, DS };
 })();
