@@ -15,6 +15,14 @@ window.STR = {
     stepN: 'Step {n}', copyPink: 'Copy the pink lines on your paper.', doneDrawing: 'Ta-da! You did it, {name}!',
     colorYours: 'Now color yours! Here is one idea.', showMe: 'Show me your drawing!', tryTablet: 'Try it on the tablet', startOver: 'Draw it again',
     photoSaved: "Wow! I love it! It's in your drawings.",
+    skipEnd: 'Skip to the end', photoShort: 'Photo', again2: 'Again', traceShort: 'Trace',
+    recentDone: 'Recently done', triedCount: '{n} of {total} done',
+    camHold: 'Hold up your drawing and smile!', camWow: 'Wow! Look at your drawing!', myDrawing: 'My drawing', theIdea: 'The idea',
+    retake: 'Try again', keepIt: 'Keep it!', camNo: "The camera didn't open. Try the camera app:", camApp: 'Camera app',
+    chooseVoice: 'Which voice', voiceAuto: 'Automatic (best voice)', voiceHelp: 'Tap a voice to hear it, and keep the one that sounds nicest on this tablet.',
+    voiceNone: "No voices found on this tablet yet. Check the tablet's text-to-speech settings.", voiceTest: "Hi {name}! Let's draw a pony together!",
+    voiceSpeed: 'Voice speed', slow: 'Slower', normal: 'Normal', photoBtn: 'Photo button (after a drawing)', wipeTried: 'Reset ✓ done drawings', fullscreen: 'Full screen',
+    th_halloween: 'Halloween', cat_halloween: 'Halloween', moreToColor: 'More pictures to color',
     act_draw: 'Draw', act_color: 'Color', act_dots: 'Dots', act_lesson: 'Draw with me', act_spin: 'Surprise!',
     say_draw: 'Draw anything you like!', say_color: 'Pick a picture to color!', say_dots: 'Connect the dots to find a mystery picture!',
     say_lesson: "Let's draw together, step by step!", say_spin: 'Spin for a silly drawing idea!',
@@ -75,6 +83,14 @@ window.STR = {
     stepN: 'Étape {n}', copyPink: 'Copie les lignes roses sur ta feuille.', doneDrawing: 'Ta-da! Tu as réussi, {name}!',
     colorYours: 'Maintenant, colorie le tien! Voici une idée.', showMe: 'Montre-moi ton dessin!', tryTablet: 'Essaie sur la tablette', startOver: 'Recommencer',
     photoSaved: "Wow! J'adore! Il est dans tes dessins.",
+    skipEnd: 'Aller à la fin', photoShort: 'Photo', again2: 'Encore', traceShort: 'Tracer',
+    recentDone: 'Faits récemment', triedCount: '{n} sur {total} faits',
+    camHold: 'Montre ton dessin et souris!', camWow: 'Wow! Regarde ton dessin!', myDrawing: 'Mon dessin', theIdea: "L'idée",
+    retake: 'Reprendre', keepIt: 'Garder!', camNo: "La caméra ne s'est pas ouverte. Essaie l'appareil photo :", camApp: 'Appareil photo',
+    chooseVoice: 'Quelle voix', voiceAuto: 'Automatique (meilleure voix)', voiceHelp: 'Touche une voix pour l’entendre, et garde la plus belle sur cette tablette.',
+    voiceNone: 'Aucune voix trouvée sur cette tablette. Vérifie les réglages de synthèse vocale.', voiceTest: 'Salut {name}! Dessinons un poney ensemble!',
+    voiceSpeed: 'Vitesse de la voix', slow: 'Plus lente', normal: 'Normale', photoBtn: 'Bouton photo (après un dessin)', wipeTried: 'Effacer les dessins ✓ faits', fullscreen: 'Plein écran',
+    th_halloween: 'Halloween', cat_halloween: 'Halloween', moreToColor: 'Encore des images à colorier',
     act_draw: 'Dessiner', act_color: 'Colorier', act_dots: 'Points', act_lesson: 'Dessine avec moi', act_spin: 'Surprise!',
     say_draw: 'Dessine tout ce que tu veux!', say_color: 'Choisis une image à colorier!', say_dots: "Relie les points pour trouver l'image mystère!",
     say_lesson: 'Dessinons ensemble, étape par étape!', say_spin: 'Fais tourner la roue pour une idée rigolote!',
@@ -131,7 +147,8 @@ window.SPIN = {
     ranch: [['🐴', 'a horse', 'un cheval'], ['🐄', 'a cow', 'une vache'], ['🐔', 'a chicken', 'une poule']],
     unicorn: [['🦄', 'a unicorn', 'une licorne'], ['🧚', 'a fairy', 'une fée']],
     sea: [['🧜', 'a mermaid', 'une sirène'], ['🐬', 'a dolphin', 'un dauphin'], ['🐙', 'an octopus', 'une pieuvre']],
-    night: [['🦉', 'an owl', 'un hibou'], ['👩‍🚀', 'an astronaut', 'une astronaute'], ['🐻', 'a teddy bear', 'un ourson']]
+    night: [['🦉', 'an owl', 'un hibou'], ['👩‍🚀', 'an astronaut', 'une astronaute'], ['🐻', 'a teddy bear', 'un ourson']],
+    halloween: [['🧙', 'a witch', 'une sorcière'], ['👻', 'a friendly ghost', 'un gentil fantôme'], ['🐈', 'a black cat', 'un chat noir'], ['🦇', 'a bat', 'une chauve-souris']]
   },
   doing: [['🧁', 'eating a cupcake', 'qui mange un petit gâteau'], ['💃', 'dancing', 'qui danse'], ['👑', 'wearing a crown', 'qui porte une couronne'],
     ['🐦', 'flying like a bird', 'qui vole comme un oiseau'], ['📖', 'reading a book', 'qui lit un livre'], ['🥕', 'eating a giant carrot', 'qui mange une carotte géante'],
@@ -144,7 +161,11 @@ window.SPIN = {
     ranch: [['🌾', 'in a big barn', 'dans une grande grange'], ['🌻', 'in a field of flowers', 'dans un champ de fleurs']],
     unicorn: [['🌈', 'on a rainbow', 'sur un arc-en-ciel']],
     sea: [['🌊', 'under the sea', 'sous la mer'], ['🐚', 'on a seashell island', 'sur une île de coquillages']],
-    night: [['🚀', 'in a rocket', 'dans une fusée'], ['⭐', 'on a shooting star', 'sur une étoile filante']]
+    night: [['🚀', 'in a rocket', 'dans une fusée'], ['⭐', 'on a shooting star', 'sur une étoile filante']],
+    halloween: [['🏚️', 'in a haunted house', 'dans une maison hantée'], ['🎃', 'in a pumpkin patch', 'dans un champ de citrouilles'], ['🌕', 'under the full moon', 'sous la pleine lune']]
+  },
+  doingTheme: {
+    halloween: [['🍬', 'trick-or-treating', 'qui passe l’Halloween'], ['🧹', 'flying on a broom', 'qui vole sur un balai'], ['🎃', 'carving a pumpkin', 'qui sculpte une citrouille']]
   },
   bonus: [['⭐', 'Add 3 stars!', 'Ajoute 3 étoiles!'], ['🌈', 'Use rainbow colors!', 'Utilise les couleurs de l’arc-en-ciel!'],
     ['🧸', 'Draw a friend too!', 'Dessine aussi un ami!'], ['💖', 'Hide a little heart!', 'Cache un petit cœur!'], ['☀️', 'Add a big sun!', 'Ajoute un gros soleil!']]

@@ -421,7 +421,13 @@
     <path d="M84 150C76 200 80 240 96 270C100 240 98 200 106 160Z" fill="url(#eHair)"/>
     <path d="M240 158C246 205 242 246 226 272C222 240 224 200 216 156Z" fill="url(#eHair)"/>
     <path d="M118 92Q150 79 182 86" stroke="#FFF3C9" stroke-width="6" fill="none" stroke-linecap="round" opacity=".85"/>
-    <g transform="translate(218 104) rotate(20)"><path d="M0 0L-18 -12L-18 12Z M0 0L18 -12L18 12Z" fill="#FF6FA8"/><circle r="6" fill="#FF3D8B"/></g>`;
+    <g transform="translate(218 104) rotate(20)"><path d="M0 0L-18 -12L-18 12Z M0 0L18 -12L18 12Z" fill="#FF6FA8"/><circle r="6" fill="#FF3D8B"/></g>
+    <g class="ellie-acc acc-halloween">
+      <ellipse cx="160" cy="93" rx="106" ry="17" transform="rotate(-4 160 93)" fill="#4B2E83"/>
+      <path d="M108 90C120 62 140 34 162 14C170 6 186 2 198 8C186 14 182 26 186 42C190 58 200 74 212 87Z" fill="#5B3A99"/>
+      <path d="M111 83Q160 72 209 78L212 89Q160 83 108 93Z" fill="#FF8A1F"/>
+      <path d="M160 70L164 78L173 79L166 85L168 94L160 89L152 94L154 85L147 79L156 78Z" fill="#FFD23F"/>
+    </g>`;
   const ellieSVG = (cls, viewBox) =>
     `<svg class="${cls || ''}" viewBox="${viewBox || '0 0 320 440'}" aria-hidden="true"><g class="bob">${ELLIE_BODY}</g></svg>`;
 
@@ -447,6 +453,7 @@
       <path d="M121 104L112 96M128 100L123 90M136 99L134 88" stroke="#3B2A20" stroke-width="3.5" stroke-linecap="round"/>
       <path class="mane" d="M128 58C152 66 168 92 152 114C146 94 132 84 116 82C116 72 120 64 128 58Z"/>
       <g class="acc acc-unicorn"><path d="M126 62L116 0L150 56Z" fill="url(#pGold)" stroke="#E0A526" stroke-width="2"/><path d="M122 40L139 37M119 22L132 20" stroke="#E0A526" stroke-width="2.5"/></g>
+      <g class="acc acc-halloween"><ellipse cx="168" cy="64" rx="50" ry="10" transform="rotate(10 168 64)" fill="#4B2E83"/><path d="M140 62C150 40 160 18 176 4C182 0 192 0 198 6C190 10 188 20 190 32C192 44 194 54 198 69Z" fill="#5B3A99"/><path d="M142 57Q170 51 197 59L198 68Q170 62 140 65Z" fill="#FF8A1F"/></g>
       <g class="acc acc-ranch"><circle cx="112" cy="78" r="9" fill="#FF6FB5"/><circle cx="112" cy="78" r="3.5" fill="#FFD23F"/><circle cx="160" cy="66" r="10" fill="#FFD23F"/><circle cx="160" cy="66" r="4" fill="#FF8C42"/><circle cx="190" cy="84" r="9" fill="#9B5DE5"/><circle cx="190" cy="84" r="3.5" fill="#FFFFFF"/></g>
       <g class="acc acc-sea" fill="none" stroke="#FFFFFF" stroke-width="3"><circle cx="22" cy="120" r="10"/><circle cx="12" cy="88" r="7"/><circle cx="26" cy="60" r="5"/><path d="M205 175L212 160L219 175L234 177L222 187L226 202L212 194L198 202L202 187L190 177Z" fill="#FF8C42" stroke="#E86A1F"/></g>
     </g>

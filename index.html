@@ -47,6 +47,7 @@
         <button data-lang="en">EN</button><button data-lang="fr">FR</button>
       </div>
       <div class="spacer"></div>
+      <button class="ibtn" id="fsBtn" aria-label="full screen"></button>
       <button class="ibtn" id="soundBtn" aria-label="sound">🔊</button>
       <button class="ibtn pill" id="stickerBtn" aria-label="stickers">⭐ <b id="stickerNum">0</b></button>
       <button class="ibtn" id="galleryBtn" aria-label="gallery">🖼️</button>
@@ -80,7 +81,7 @@
   <!-- ============ PICKER (coloring pages / dots / lessons) ============ -->
   <section id="picker" class="screen">
     <header class="bar">
-      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <button class="ibtn back-btn" data-back aria-label="back"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M15 4.5L7.5 12L15 19.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <h2 class="bar-title" id="pickerTitle"></h2>
       <button class="ibtn" id="pickerSay" aria-label="say">🔊</button>
     </header>
@@ -90,7 +91,7 @@
   <!-- ============ WORK (the drawing screen) ============ -->
   <section id="work" class="screen" data-mode="draw">
     <header class="bar work-bar">
-      <button class="ibtn face-btn" id="workHome" aria-label="home"></button>
+      <button class="ibtn back-btn" data-back aria-label="back"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M15 4.5L7.5 12L15 19.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="banner" id="banner"><span class="b-emoji" id="bannerEmoji"></span><span class="b-text" id="bannerText"></span></div>
       <button class="ibtn" id="sayBtn" aria-label="say">🔊</button>
       <button class="ibtn act" id="undoBtn"><span>↩️</span><small data-t="undo"></small></button>
@@ -106,9 +107,9 @@
           <svg id="overlay" viewBox="0 0 1200 900" preserveAspectRatio="none"></svg>
           <div id="guideCrayon" class="guide-crayon hidden">🖍️</div>
           <div class="stage-btns">
-            <button id="prevStep" class="round-btn small" aria-label="back">⬅</button>
+            <button id="prevStep" class="round-btn small" aria-label="previous step">◀</button>
             <div id="stepDots" class="step-dots"></div>
-            <button id="nextStep" class="round-btn go" aria-label="next">➜</button>
+            <span class="step-right"><button id="skipStep" class="round-btn small" aria-label="skip to coloring">⏩</button><button id="nextStep" class="round-btn go" aria-label="next">➜</button></span>
           </div>
           <button id="colorItBtn" class="pill-btn go colorit hidden">🎨 <span data-t="colorIt"></span></button>
         </div>
@@ -121,7 +122,7 @@
   <!-- ============ DRAW TOGETHER (copy on paper) ============ -->
   <section id="paper" class="screen">
     <header class="bar">
-      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <button class="ibtn back-btn" data-back aria-label="back"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M15 4.5L7.5 12L15 19.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <h2 class="bar-title" id="paperTitle"></h2>
       <button class="ibtn" id="paperSay" aria-label="say">🔊</button>
     </header>
@@ -138,24 +139,28 @@
         <div class="paper-text" id="paperText"></div>
         <div class="paper-dots" id="paperDots"></div>
         <div class="paper-nav" id="paperNav">
-          <button id="pBack" class="round-btn" aria-label="back">⬅</button>
+          <button id="pBack" class="round-btn" aria-label="previous step">◀</button>
           <button id="pReplay" class="round-btn" aria-label="watch again">↻</button>
           <button id="pNext" class="round-btn go" aria-label="next">➜</button>
         </div>
+        <button id="pSkip" class="pill-btn skip-btn">⏩ <span data-t="skipEnd"></span></button>
         <div class="paper-end hidden" id="paperEnd">
-          <button id="pPhoto" class="pill-btn go">📷 <span data-t="showMe"></span></button>
-          <button id="pTablet" class="pill-btn">✏️ <span data-t="tryTablet"></span></button>
-          <button id="pAgain" class="pill-btn">🔁 <span data-t="startOver"></span></button>
+          <button id="pColor" class="pill-btn go big-color">🎨 <span data-t="colorIt"></span></button>
+          <div class="end-row">
+            <button id="pPhoto" class="mini-act">📷<small data-t="photoShort"></small></button>
+            <button id="pAgain" class="mini-act">🔁<small data-t="again2"></small></button>
+            <button id="pTablet" class="mini-act">✏️<small data-t="traceShort"></small></button>
+          </div>
         </div>
       </div>
     </div>
-    <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+    <input type="file" id="photoInput" accept="image/*" capture="user" hidden>
   </section>
 
   <!-- ============ SURPRISE SPINNER ============ -->
   <section id="spin" class="screen">
     <header class="bar">
-      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <button class="ibtn back-btn" data-back aria-label="back"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M15 4.5L7.5 12L15 19.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <h2 class="bar-title" data-t="spinTitle"></h2>
       <button class="ibtn" id="spinSay" aria-label="say">🔊</button>
     </header>
@@ -172,7 +177,7 @@
   <!-- ============ GALLERY ============ -->
   <section id="gallery" class="screen">
     <header class="bar">
-      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <button class="ibtn back-btn" data-back aria-label="back"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M15 4.5L7.5 12L15 19.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <h2 class="bar-title" data-t="gallery"></h2>
       <span class="ibtn ghost"></span>
     </header>
@@ -182,16 +187,35 @@
   <!-- ============ STICKER BOOK ============ -->
   <section id="stickers" class="screen">
     <header class="bar">
-      <button class="ibtn" data-home aria-label="home">🏠</button>
+      <button class="ibtn back-btn" data-back aria-label="back"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M15 4.5L7.5 12L15 19.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <h2 class="bar-title"><span data-t="stickers"></span> · <small id="stickerCount"></small></h2>
       <span class="ibtn ghost"></span>
     </header>
     <div class="sticker-grid" id="stickerGrid"></div>
   </section>
 
+  <!-- ============ CAMERA: show me your drawing ============ -->
+  <div id="camera" class="camera hidden">
+    <div class="cam-card">
+      <div class="cam-title" id="camText"></div>
+      <div class="cam-panels">
+        <div class="cam-panel"><div class="cam-live"><video id="camVideo" autoplay playsinline muted></video><canvas id="camShot" class="hidden"></canvas><div id="camCount" class="cam-count"></div><div id="camFlash" class="cam-flash"></div></div><span>📷 <span data-t="myDrawing"></span></span></div>
+        <div class="cam-panel"><div class="cam-ref"><canvas id="camRef" width="1200" height="900"></canvas></div><span>💡 <span data-t="theIdea"></span></span></div>
+      </div>
+      <div class="cam-actions">
+        <button id="camClose" class="round-btn" aria-label="close">✖</button>
+        <button id="camSnap" class="round-btn go" aria-label="take the photo">📷</button>
+        <button id="camApp" class="pill-btn hidden">📱 <span data-t="camApp"></span></button>
+        <button id="camRetake" class="pill-btn hidden">🔁 <span data-t="retake"></span></button>
+        <button id="camKeep" class="pill-btn go hidden">⭐ <span data-t="keepIt"></span></button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal" class="modal hidden"><div class="modal-card" id="modalCard"></div></div>
   <canvas id="fx"></canvas>
   <div id="toast" class="toast"></div>
+  <div id="stickerPop" class="sticker-pop" aria-live="polite"></div>
 
   <script src="js/i18n.js"></script>
   <script src="js/art.js"></script>
@@ -202,6 +226,7 @@
   <script src="js/packs/yummy.js"></script>
   <script src="js/packs/magic.js"></script>
   <script src="js/packs/things.js"></script>
+  <script src="js/packs/halloween.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

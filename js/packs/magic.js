@@ -322,7 +322,7 @@
     g += 'Z';
     const armL = 'M420 480C372 488 340 525 350 550C360 572 400 555 420 540';
     L.ghost = {
-      name: ['Friendly ghost', 'Gentil fantôme'], emoji: '👻', level: 1, cat: 'magic',
+      name: ['Friendly ghost', 'Gentil fantôme'], emoji: '👻', level: 1, cat: 'halloween',
       steps: [
         { t: ['Draw a tall ghost with a wavy bottom.', 'Dessine un grand fantôme avec le bas en vagues.'], d: [g] },
         { t: ['Add two little arms.', 'Ajoute deux petits bras.'], d: [armL, mir(armL)] },
@@ -347,7 +347,7 @@
     const mt = [[720, 575], [600, 635], [480, 575]];
     const m1 = qz(mt, (720 - 615) / 240), m2 = qz(mt, (720 - 585) / 240);
     L.pumpkin = {
-      name: ['Pumpkin', 'Citrouille'], emoji: '🎃', level: 2, cat: 'magic',
+      name: ['Pumpkin', 'Citrouille'], emoji: '🎃', level: 2, cat: 'halloween',
       steps: [
         { t: ['Draw a tall oval in the middle.', 'Dessine un grand ovale au milieu.'], d: [E(c)] },
         { t: ['Add a round bump on each side.', 'Ajoute une bosse ronde de chaque côté.'], d: [lobeL, mir(lobeL)] },

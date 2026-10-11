@@ -19,7 +19,8 @@
   };
   const S = {
     lang: store.get('lang', CFG.defaultLang), theme: store.get('theme', 'ranch'), level: store.get('level', 1),
-    sound: store.get('sound', true), voice: store.get('voice', true), pony: store.get('pony', null), stickers: store.get('stickers', {})
+    sound: store.get('sound', true), voice: store.get('voice', true), pony: store.get('pony', null), stickers: store.get('stickers', {}),
+    photo: store.get('photoBtn', true)
   };
   if (!STR[S.lang]) S.lang = 'en';
 
@@ -40,7 +41,8 @@
     ranch: { emoji: '🐴', color: '#7CCBFF', stamps: ['🐴', '🐎', '🥕', '🍎', '🌻', '🌳', '🐣', '🌞'] },
     unicorn: { emoji: '🦄', color: '#F7B8E6', stamps: ['🦄', '🌈', '💖', '⭐', '🧁', '🌸', '👑', '🎀'] },
     sea: { emoji: '🐠', color: '#1FA9C9', stamps: ['🐠', '🐟', '🐙', '🐬', '🐳', '🐚', '🦀', '⭐'] },
-    night: { emoji: '🌙', color: '#3A3480', stamps: ['🌙', '⭐', '🌟', '🚀', '☁️', '🦉', '✨', '🦄'] }
+    night: { emoji: '🌙', color: '#3A3480', stamps: ['🌙', '⭐', '🌟', '🚀', '☁️', '🦉', '✨', '🦄'] },
+    halloween: { emoji: '🎃', color: '#3D1F63', stamps: ['🎃', '👻', '🦇', '🕷️', '🕸️', '🍬', '🍭', '🌕'] }
   };
   const EXTRA_STAMPS = ['💖', '⭐', '🌈', '🦋', '🐞', '🍓', '🎈', '🌷'];
   const PALETTE = ['#E63946', '#FF8C42', '#FFD23F', '#8AC926', '#2A9D58', '#2EC4B6', '#4CC9F0', '#3A6EE8', '#8E5BE8', '#FF6FB5', '#FFD3B6', '#9C6644', '#2B2B2B', '#FFFFFF'];
@@ -62,12 +64,22 @@
     });
     return Object.assign(out, P.lessons);
   })();
-  const CAT_EMOJI = { all: '🌈', new: '✨', horses: '🐴', animals: '🐾', sea: '🐠', yummy: '🍓', magic: '🔮', things: '🚗' };
-  const CATS = ['all', 'new', 'horses', 'animals', 'sea', 'yummy', 'magic', 'things'];
+  const CAT_EMOJI = { all: '🌈', new: '✨', horses: '🐴', animals: '🐾', sea: '🐠', yummy: '🍓', magic: '🔮', things: '🚗', halloween: '🎃' };
+  const HALLOWEEN_SEASON = (() => { const d = new Date(), m = d.getMonth(), day = d.getDate(); return m === 9 || (m === 8 && day >= 20) || (m === 10 && day <= 3); })();
+  const CATS = ['all', 'new'].concat(HALLOWEEN_SEASON ? ['halloween'] : [], ['horses', 'animals', 'sea', 'yummy', 'magic', 'things'], HALLOWEEN_SEASON ? [] : ['halloween']);
+  const THEME_CAT = { ranch: 'horses', unicorn: 'magic', sea: 'sea', night: 'magic', halloween: 'halloween' };
   // ---- "seen" drawings + drawing of the day ----
-  const seen = store.get('paperSeen', {});
-  const isNew = (id) => !seen[id];
-  function markSeen(id) { if (!seen[id]) { seen[id] = Date.now(); store.set('paperSeen', seen); } }
+  // ✓ "tried" = she started or finished it. (Carries over drawings she opened before this update.)
+  const tried = store.get('paperTried', null) || (() => { const o = {}, sn = store.get('paperSeen', {}); Object.keys(sn).forEach((k) => { o[k] = { t: sn[k] }; }); return o; })();
+  store.set('paperTried', tried);
+  const isNew = (id) => !tried[id];
+  function markTried(id, extra) { if (!LESSONS[id]) return; tried[id] = Object.assign(tried[id] || {}, { t: Date.now() }, extra || {}); store.set('paperTried', tried); }
+  function lessonSvg(id) {
+    const L = LESSONS[id];
+    const paths = L.steps.reduce((a, st) => a.concat(st.d), []).map((d) => `<path d="${Array.isArray(d) ? d[0] : d}"${Array.isArray(d) && d[1] === 'k' ? ' fill="#3A2A4A"' : ''}/>`).join('');
+    return `<svg viewBox="0 0 1200 900"><g fill="none" stroke="#3A2A4A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg>`;
+  }
+  const lessonShapes = (L) => L.steps.reduce((a, st) => a.concat(st.d.map((d) => [Array.isArray(d) ? d[0] : d, Array.isArray(d) && d[1] === 'k' ? 'k' : 'n', 1])), []);
   const ORDER = (() => { // stable shuffled order so every day brings a different drawing
     const ids = Object.keys(LESSONS).sort(); let seed = 20261010;
     const r = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
@@ -82,6 +94,7 @@
     const dayN = Math.floor(new Date(key.replace(/-/g, '/')).getTime() / 864e5);
     let id = null;
     if (!cur) id = ORDER.find((c) => LESSONS[c].cat === 'horses' && isNew(c)) || null; // the very first one is a horse!
+    if (!id && HALLOWEEN_SEASON) id = ORDER.find((c) => LESSONS[c].cat === 'halloween' && isNew(c)) || null; // spooky season
     for (let k = 0; k < ORDER.length && !id; k++) { const c = ORDER[(dayN + k) % ORDER.length]; if (isNew(c)) { id = c; break; } }
     if (!id) id = ORDER[dayN % ORDER.length];
     store.set('dotd', { date: key, id }); return id;
@@ -150,27 +163,61 @@
   }
 
   // ================= VOICE =================
+  // Picks the nicest voice on the device: Canadian first, then US/UK; skips robotic & novelty voices.
+  // Grown-ups can override it in the ⚙️ menu (saved per language).
   let voices = [];
   const hasSpeech = 'speechSynthesis' in window;
   function loadVoices() { try { voices = window.speechSynthesis.getVoices() || []; } catch (e) { voices = []; } }
-  if (hasSpeech) { loadVoices(); try { window.speechSynthesis.onvoiceschanged = loadVoices; } catch (e) { /* ignore */ } }
+  if (hasSpeech) {
+    loadVoices();
+    try { window.speechSynthesis.onvoiceschanged = loadVoices; } catch (e) { /* ignore */ }
+    let vTries = 0; const vPoll = setInterval(() => { loadVoices(); if (voices.length || ++vTries > 24) clearInterval(vPoll); }, 250);
+  }
   let emojiRe = null; try { emojiRe = new RegExp('\\p{Extended_Pictographic}|\\uFE0F|\\u200D', 'gu'); } catch (e) { emojiRe = null; }
-  function say(text) {
-    if (!S.voice || !hasSpeech || !text) return;
+  const BAD_VOICE = /albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|\bfred\b|kathy|eddy|\bflo\b|grandma|grandpa|\breed\b|rocko|sandy|shelley|deranged|hysterical|novelty|espeak/i;
+  const NICE_VOICE = /premium|enhanced|natural|neural|wavenet|siri|google|samantha|\bava\b|allison|susan|\bzoe\b|nicky|karen|moira|tessa|serena|joanna|salli|kendra|kimberly|\bivy\b|am[ée]lie|aur[ée]lie|audrey|\bmarie\b|chantal|\bjulie\b|sylvie|c[ée]line|l[ée]a\b/i;
+  const vlang = (v) => String(v.lang || '').replace(/_/g, '-').toLowerCase();
+  const langPrefs = () => (S.lang === 'fr' ? ['fr-ca', 'fr-fr', 'fr-be', 'fr-ch', 'fr'] : ['en-ca', 'en-us', 'en-gb', 'en-au', 'en-ie', 'en-nz', 'en']);
+  function voiceScore(v) {
+    const L = vlang(v), prefs = langPrefs(), idx = prefs.findIndex((p) => L.indexOf(p) === 0);
+    if (idx < 0) return -1;
+    const n = String(v.name || '');
+    let sc = 100 + (prefs.length - idx) * 8;
+    if (BAD_VOICE.test(n)) sc -= 200;
+    if (NICE_VOICE.test(n)) sc += 25;
+    if (/premium|enhanced|neural|natural/i.test(n)) sc += 20;
+    if (/compact/i.test(n)) sc -= 10;
+    if (v.localService === false) sc += 4;
+    return sc;
+  }
+  function voicesForLang() { return voices.filter((v) => voiceScore(v) >= 0).sort((x, y) => voiceScore(y) - voiceScore(x)); }
+  const voiceId = (v) => v.voiceURI || v.name;
+  function pickVoice() {
+    const chosen = store.get('voice_' + S.lang, null);
+    if (chosen) { const v = voices.find((x) => voiceId(x) === chosen); if (v) return v; }
+    const list = voicesForLang();
+    return list.length && voiceScore(list[0]) > 0 ? list[0] : null;
+  }
+  let sayT = null, laterT = null;
+  function sayLater(text, ms) { clearTimeout(laterT); laterT = setTimeout(() => { laterT = null; say(text); }, ms || 500); }
+  function say(text, force, queue) {
+    if (!queue) clearTimeout(laterT);
+    if ((!S.voice && !force) || !hasSpeech || !text) return;
     try {
-      const ss = window.speechSynthesis; ss.cancel();
-      const clean = emojiRe ? String(text).replace(emojiRe, '') : String(text);
+      const ss = window.speechSynthesis;
+      const clean = (emojiRe ? String(text).replace(emojiRe, '') : String(text)).replace(/\s+/g, ' ').trim();
+      if (!clean) return;
       const u = new SpeechSynthesisUtterance(clean);
-      const prefs = S.lang === 'fr' ? ['fr-ca', 'fr-fr', 'fr'] : ['en-us', 'en-ca', 'en-gb', 'en'];
-      u.lang = S.lang === 'fr' ? 'fr-CA' : 'en-US';
-      let v = null;
-      for (const p of prefs) { v = voices.find((x) => x.lang && x.lang.replace('_', '-').toLowerCase().indexOf(p) === 0); if (v) break; }
-      if (v) u.voice = v;
-      u.rate = 0.95; u.pitch = 1.15;
-      ss.speak(u);
+      const v = pickVoice();
+      if (v) { u.voice = v; u.lang = v.lang; } else u.lang = S.lang === 'fr' ? 'fr-CA' : 'en-US';
+      u.rate = store.get('voiceRate', 1); u.pitch = 1; u.volume = 1;
+      if (queue && (ss.speaking || ss.pending)) { ss.speak(u); return; }
+      clearTimeout(sayT);
+      if (ss.speaking || ss.pending) { ss.cancel(); sayT = setTimeout(() => { try { ss.speak(u); } catch (e) { /* ignore */ } }, 90); }
+      else ss.speak(u);
     } catch (e) { /* ignore */ }
   }
-  function hush() { if (hasSpeech) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } } }
+  function hush() { clearTimeout(sayT); if (hasSpeech) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } } }
 
   // ================= UI helpers =================
   let toastT = null;
@@ -178,11 +225,29 @@
     const el = $('#toast'); el.textContent = msg; el.classList.add('show');
     clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2200);
   }
+  let tapGuardUntil = 0;
+  const guardTaps = (ms) => { if (window.__ellieNoGuard) return; tapGuardUntil = Date.now() + (ms || 350); }; // (test scripts can switch it off)
+  document.addEventListener('click', (e) => { if (Date.now() < tapGuardUntil) { e.stopPropagation(); e.preventDefault(); } }, true);
+  let pickScroll = 0;
   function show(id) {
+    const cur = document.querySelector('.screen.active');
+    if (cur && cur.id === 'picker' && id !== 'picker') pickScroll = $('#cards').scrollTop;
+    if (!cur || cur.id !== id) guardTaps();
+    if (id !== 'spin') clearSpinTimers();
     $$('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
     if (id !== 'work') stopLessonAnim();
     if (id !== 'paper') { stopPaperAnim(); wakeOff(); }
     if (id === 'work') requestAnimationFrame(fitStage);
+  }
+  // Pop-ups (menus, viewer, camera) get their own history step, so the tablet's Back button closes them first.
+  const SID = Date.now() + '' + Math.floor(Math.random() * 1e6);
+  let ovPushed = false, ignorePop = 0, afterPop = null;
+  function ovOpen() { if (ovPushed) return; try { history.pushState({ d: NAV.length, sid: SID, ov: 1 }, ''); ovPushed = true; } catch (e) { /* ignore */ } }
+  function ovRelease(then) {
+    if (ovPushed) {
+      ovPushed = false; ignorePop++; afterPop = then || null;
+      try { history.back(); } catch (e) { ignorePop = Math.max(0, ignorePop - 1); afterPop = null; if (then) then(); }
+    } else if (then) then();
   }
   let modalT = null, modalOnClose = null;
   function openModal(html, opts) {
@@ -190,14 +255,56 @@
     const m = $('#modal'); $('#modalCard').innerHTML = html; m.classList.remove('hidden');
     m.dataset.tap = opts.tapClose ? '1' : '';
     modalOnClose = opts.onClose || null;
-    clearTimeout(modalT); if (opts.auto) modalT = setTimeout(closeModal, opts.auto);
+    clearTimeout(modalT); if (opts.auto) modalT = setTimeout(() => closeModal(), opts.auto);
+    ovOpen();
   }
-  function closeModal() {
+  function hideModal() {
     clearTimeout(modalT); $('#modal').classList.add('hidden'); $('#modalCard').innerHTML = '';
     const cb = modalOnClose; modalOnClose = null; if (cb) cb();
   }
+  function closeModal(then) { hideModal(); if ($('#camera').classList.contains('hidden')) ovRelease(then); else if (then) then(); }
   $('#modal').addEventListener('click', (e) => { if ($('#modal').dataset.tap === '1' || e.target.id === 'modal') closeModal(); });
   function jump(el) { el.classList.remove('jump'); void el.offsetWidth; el.classList.add('jump'); }
+
+  // ================= NAVIGATION =================
+  // One back arrow on every screen. Each screen is a step on a stack; the tablet's own back button
+  // (Fire / Android) walks the same stack instead of leaving the app.
+  const NAV = [];
+  function navInit() { NAV.length = 0; NAV.push({ screen: 'home', restore: goHomeView }); try { history.replaceState({ d: 1, sid: SID }, ''); } catch (e) { /* ignore */ } }
+  function nav(screen, restore, mode) {
+    if (mode === 'none') return;
+    if (mode === 'replace' && NAV.length > 1) { NAV[NAV.length - 1] = { screen, restore }; try { history.replaceState({ d: NAV.length, sid: SID }, ''); } catch (e) { /* ignore */ } return; }
+    NAV.push({ screen, restore }); try { history.pushState({ d: NAV.length, sid: SID }, ''); } catch (e) { /* ignore */ }
+  }
+  function closeOverlaysSilently() {
+    if (!$('#modal').classList.contains('hidden')) hideModal();
+    if (!$('#camera').classList.contains('hidden')) closeCamera(true);
+  }
+  function popTo(depth) {
+    depth = Math.max(1, Math.min(depth, NAV.length));
+    if (depth === NAV.length) return;
+    NAV.length = depth;
+    ovPushed = false; closeOverlaysSilently(); hush();
+    NAV[NAV.length - 1].restore();
+  }
+  function navBack() {
+    sfx.tap();
+    if (NAV.length <= 1) { goHomeView(); return; }
+    let viaHistory = false;
+    try { if (history.state && history.state.sid === SID && history.state.d === NAV.length && !history.state.ov) { history.back(); viaHistory = true; } } catch (e) { /* ignore */ }
+    if (!viaHistory) popTo(NAV.length - 1);
+  }
+  window.addEventListener('popstate', (e) => {
+    if (ignorePop > 0) { ignorePop--; const f = afterPop; afterPop = null; if (f) f(); return; }
+    if (ovPushed) { ovPushed = false; closeOverlaysSilently(); return; } // Back closes the pop-up only
+    const st = e.state || {}, d = st.d || 1;
+    if (st.sid && st.sid !== SID) { // leftovers from before a page reload
+      if (NAV.length === 1) { try { history.go(-d); } catch (er) { /* ignore */ } } else popTo(NAV.length - 1);
+      return;
+    }
+    if (d < NAV.length) popTo(d);
+    else if (d > NAV.length) { ignorePop++; try { history.go(-(d - NAV.length)); } catch (er) { ignorePop--; } } // no "forward"
+  });
 
   // ---------- confetti ----------
   const fx = $('#fx'), fctx = fx.getContext('2d');
@@ -230,7 +337,7 @@
 
   // ================= THEME / SCENE =================
   function buildScene() {
-    const th = S.theme; let h = '';
+    const th = S.theme; let h = '', tail = '';
     const hills = `<svg class="hills" viewBox="0 0 1000 300" preserveAspectRatio="none"><path d="M0 170Q250 60 500 150T1000 120V300H0Z" style="fill:var(--ground)"/><path d="M0 230Q300 150 600 220T1000 200V300H0Z" style="fill:var(--ground2)"/></svg>`;
     const r = (a, b) => Math.round(a + Math.random() * (b - a));
     if (th === 'ranch') {
@@ -242,14 +349,21 @@
       for (let i = 0; i < 7; i++) h += `<div class="deco sparkle-deco" style="left:${r(3, 95)}vw;top:${r(5, 65)}vh;animation-delay:-${r(0, 30) / 10}s">✨</div>`;
     } else if (th === 'sea') {
       for (let i = 0; i < 10; i++) h += `<div class="deco bubble-deco" style="left:${r(2, 97)}vw;bottom:-30px;width:${r(14, 30)}px;height:auto;aspect-ratio:1;animation-duration:${r(9, 18)}s;animation-delay:-${r(0, 160) / 10}s"></div>`;
+    } else if (th === 'halloween') {
+      h += '<div class="deco hmoon" style="right:8vw;top:7vh"></div>';
+      for (let i = 0; i < 10; i++) h += `<div class="deco twinkle" style="left:${r(2, 97)}vw;top:${r(3, 45)}vh;animation-delay:-${r(0, 24) / 10}s"></div>`;
+      for (let i = 0; i < 4; i++) h += `<div class="deco bat" style="top:${r(8, 42)}vh;animation-duration:${r(16, 26)}s;animation-delay:-${r(0, 220) / 10}s"><span>🦇</span></div>`;
+      h += '<div class="deco ghosty" style="left:5vw;top:24vh">👻</div>';
+      tail = '<div class="deco pump" style="left:3vw;bottom:3vh">🎃</div><div class="deco pump small" style="right:4vw;bottom:5vh">🎃</div>';
     } else {
       h += '<div class="deco moon" style="right:10vw;top:8vh"></div>';
       for (let i = 0; i < 18; i++) h += `<div class="deco twinkle" style="left:${r(2, 97)}vw;top:${r(3, 68)}vh;animation-delay:-${r(0, 24) / 10}s"></div>`;
     }
-    $('#scene').innerHTML = h + hills;
+    $('#scene').innerHTML = h + hills + tail;
     const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', THEMES[th].color);
   }
   function applyTheme() {
+    if (!THEMES[S.theme]) S.theme = 'ranch';
     document.body.dataset.theme = S.theme;
     buildScene();
     $$('#themeBtns button').forEach((b) => b.classList.toggle('on', b.dataset.theme === S.theme));
@@ -319,7 +433,11 @@
   function resetPaint(img) {
     pctx.globalCompositeOperation = 'source-over'; pctx.globalAlpha = 1;
     pctx.fillStyle = '#fff'; pctx.fillRect(0, 0, W, H);
-    if (img) { const im = new Image(); im.onload = () => pctx.drawImage(im, 0, 0, W, H); im.src = img; }
+    if (img) { // fit (never stretch) — photos are wider than the page
+      const im = new Image();
+      im.onload = () => { const sc = Math.min(W / im.width, H / im.height), dw = im.width * sc, dh = im.height * sc; pctx.drawImage(im, (W - dw) / 2, (H - dh) / 2, dw, dh); };
+      im.src = img;
+    }
   }
   function pushUndo() { try { WS.undo.push(pctx.getImageData(0, 0, W, H)); if (WS.undo.length > 8) WS.undo.shift(); } catch (e) { /* ignore */ } }
 
@@ -454,6 +572,7 @@
   }
   stage.addEventListener('pointerdown', (e) => {
     if (pid !== null || (e.target.closest && e.target.closest('button'))) return;
+    if (Date.now() < tapGuardUntil) return; // second half of a double-tap that opened this screen
     pid = e.pointerId; try { stage.setPointerCapture(pid); } catch (er) { /* ignore */ }
     audio(); onDown(pos(e)); e.preventDefault();
   });
@@ -467,6 +586,10 @@
   stage.addEventListener('pointerup', endPtr);
   stage.addEventListener('pointercancel', endPtr);
   stage.addEventListener('contextmenu', (e) => e.preventDefault());
+  // A fast finger-lift on the canvas made Chromium swallow the NEXT tap (felt like "Color it" needed a double tap).
+  const noFling = (e) => { if (e.target.closest && e.target.closest('button')) return; if (e.cancelable) e.preventDefault(); };
+  stage.addEventListener('touchstart', noFling, { passive: false });
+  stage.addEventListener('touchmove', noFling, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
 
   // ---------- palette & tools ----------
@@ -527,10 +650,10 @@
   });
   $('#saveBtn').addEventListener('click', () => saveDrawing());
   $('#sayBtn').addEventListener('click', () => say($('#bannerText').textContent));
-  $('#workHome').addEventListener('click', goHome);
 
   function setBanner(emoji, text) {
     $('#bannerEmoji').textContent = emoji || ''; $('#bannerText').textContent = text || '';
+    $('#banner').classList.toggle('long', String(text || '').length > 70);
     const b = $('#banner'); b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
   }
 
@@ -538,24 +661,89 @@
     opts = opts || {};
     WS.mode = mode; $('#work').dataset.mode = mode;
     WS.undo = []; WS.rewarded = false; pid = null; last = null;
-    overlay.innerHTML = ''; $('#guideCrayon').classList.add('hidden'); $('#colorItBtn').classList.add('hidden');
+    overlay.innerHTML = ''; overlay.classList.remove('tight'); $('#guideCrayon').classList.add('hidden'); $('#colorItBtn').classList.add('hidden');
     closeTray(); stopLessonAnim();
     resetPaint(opts.image);
     setLineArt(opts.shapes || null, opts.lineLevel || S.level);
     WS.tool = mode === 'color' ? 'fill' : 'crayon';
     if (mode === 'lesson') WS.color = '#2B2B2B';
     if (THEMES[S.theme].stamps.indexOf(WS.stamp) < 0 && EXTRA_STAMPS.indexOf(WS.stamp) < 0) WS.stamp = THEMES[S.theme].stamps[0];
+    WS.lessonId = opts.lessonId || null;
     renderPalette(); renderTools();
     show('work');
+    nav('work', () => show('work'), opts.nav || 'push');
   }
 
   // ---------- saving ----------
+  // ---------- gallery: pictures live in IndexedDB (lots of room); the small list stays in localStorage ----------
+  const GCACHE = {};
+  function gcachePut(id, url) { GCACHE[id] = url; const k = Object.keys(GCACHE); while (k.length > 40) delete GCACHE[k.shift()]; }
+  let gdbP = null;
+  function gdb() {
+    if (gdbP) return gdbP;
+    gdbP = new Promise((resolve) => {
+      try {
+        if (!window.indexedDB) { resolve(null); return; }
+        const req = indexedDB.open('draw4fun', 1);
+        req.onupgradeneeded = () => { try { req.result.createObjectStore('img'); } catch (e) { /* ignore */ } };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+        req.onblocked = () => resolve(null);
+      } catch (e) { resolve(null); }
+    });
+    return gdbP;
+  }
+  function idb(mode, fn) {
+    return gdb().then((db) => new Promise((res) => {
+      if (!db) { res(null); return; }
+      try {
+        const tx = db.transaction('img', mode), r = fn(tx.objectStore('img'));
+        tx.oncomplete = () => res(r && r.result !== undefined && mode === 'readonly' ? r.result : true);
+        tx.onerror = tx.onabort = () => res(null);
+      } catch (e) { res(null); }
+    }));
+  }
   function getGallery() { return store.get('gallery', []); }
   function setGallery(g) { return store.set('gallery', g); }
+  function galleryImg(item) {
+    if (!item) return Promise.resolve(null);
+    if (item.img) return Promise.resolve(item.img);
+    if (GCACHE[item.id]) return Promise.resolve(GCACHE[item.id]);
+    return idb('readonly', (st) => st.get(item.id)).then((v) => { if (typeof v === 'string') { gcachePut(item.id, v); return v; } return null; });
+  }
   function addToGallery(url) {
-    const g = getGallery(); g.unshift({ id: Date.now(), img: url });
-    while (g.length > 30) g.pop();
-    while (!setGallery(g) && g.length > 1) g.pop();
+    const g = getGallery(), id = Date.now();
+    gcachePut(id, url); g.unshift({ id });
+    while (g.length > 200) { const old = g.pop(); idb('readwrite', (st) => st.delete(old.id)); }
+    setGallery(g);
+    idb('readwrite', (st) => st.put(url, id)).then((ok) => {
+      if (ok) return;
+      // no IndexedDB on this device: keep the picture inside the list (smaller limit, oldest drop off)
+      const g2 = getGallery(), it = g2.find((x) => x.id === id); if (!it) return;
+      it.img = url;
+      while (g2.length > 1 && JSON.stringify(g2).length > 2400000) g2.pop();
+      if (!setGallery(g2)) toast('🙈');
+    });
+    return id;
+  }
+  function removeFromGallery(id) { setGallery(getGallery().filter((x) => x.id !== id)); delete GCACHE[id]; idb('readwrite', (st) => st.delete(id)); }
+  function wipeGallery() { setGallery([]); Object.keys(GCACHE).forEach((k) => delete GCACHE[k]); idb('readwrite', (st) => st.clear()); }
+  function migrateGallery() { // pictures saved by the previous version sat inside localStorage
+    const g = getGallery(); if (!g.some((x) => x.img)) return;
+    gdb().then((db) => {
+      if (!db) return;
+      let chain = Promise.resolve();
+      g.filter((x) => x.img).forEach((it) => {
+        chain = chain.then(() => idb('readwrite', (st) => st.put(it.img, it.id)).then((ok) => { if (ok) { gcachePut(it.id, it.img); delete it.img; } }));
+      });
+      chain.then(() => setGallery(g));
+    });
+  }
+  function fillImgs(root) {
+    const byId = {}; getGallery().forEach((x) => { byId[x.id] = x; });
+    root.querySelectorAll('img[data-gid]').forEach((im) => {
+      galleryImg(byId[im.dataset.gid]).then((url) => { if (url) im.src = url; });
+    });
   }
   function composite(scale) {
     const c = document.createElement('canvas'); c.width = Math.round(W * scale); c.height = Math.round(H * scale);
@@ -563,7 +751,8 @@
   }
   function saveDrawing(silent) {
     let url; try { url = composite(0.75).toDataURL('image/jpeg', 0.82); } catch (e) { toast('🙈'); return; }
-    addToGallery(url);
+    const gid = addToGallery(url);
+    if (WS.lessonId) markTried(WS.lessonId, { img: gid });
     sfx.tada(); confetti(70);
     if (!silent) toast('⭐ ' + t('saved'));
     if (!WS.rewarded) { WS.rewarded = true; setTimeout(giveSticker, 700); } else say(t('saved'));
@@ -574,17 +763,25 @@
     const owned = S.stickers, unowned = STICKERS.filter((s) => !owned[s]);
     const s = unowned.length ? rnd(unowned) : rnd(STICKERS);
     owned[s] = (owned[s] || 0) + 1; store.set('stickers', owned); updateStickerNum();
-    neigh(); setTimeout(() => say(t('praise') + ' ' + t('gotSticker')), 600);
-    openModal(`<div class="reward-emoji">${s}</div><h3>${t('gotSticker')}</h3><div class="muted">${t('tapToClose')}</div>`, { tapClose: true, auto: 4500 });
-    confetti(120);
+    neigh(); setTimeout(() => say(t('praise') + ' ' + t('gotSticker'), false, true), 600);
+    // a little pop-up that never blocks her taps, then flies to the sticker book
+    const pop = $('#stickerPop');
+    pop.innerHTML = `<div class="sp-emoji">${s}</div><div class="sp-text">${t('gotSticker')}</div>`;
+    pop.classList.remove('show', 'fly'); void pop.offsetWidth; pop.classList.add('show');
+    clearTimeout(popT1); clearTimeout(popT2);
+    popT1 = setTimeout(() => pop.classList.add('fly'), 2300);
+    popT2 = setTimeout(() => pop.classList.remove('show', 'fly'), 3050);
+    confetti(110);
   }
-  function showStickers() {
+  let popT1 = null, popT2 = null;
+  function showStickers(navMode) {
     const owned = S.stickers, n = Object.keys(owned).length;
     $('#stickerCount').textContent = t('stickerCount', { n, total: STICKERS.length });
     $('#stickerGrid').innerHTML = STICKERS.map((s) => owned[s]
       ? `<button class="sticker" data-s="${s}">${s}${owned[s] > 1 ? `<span class="cnt">×${owned[s]}</span>` : ''}</button>`
       : '<div class="sticker locked">?</div>').join('');
     show('stickers'); say(t('stickerCount', { n, total: STICKERS.length }));
+    nav('stickers', () => showStickers('none'), navMode || 'push');
   }
   $('#stickerGrid').addEventListener('click', (e) => { const b = e.target.closest('.sticker[data-s]'); if (b) { jump(b); sfx.boing(); } });
 
@@ -598,16 +795,42 @@
     svgEl('g', { id: 'dLines' }, overlay);
     svgEl('line', { id: 'rubber', class: 'rubber', x1: 0, y1: 0, x2: 0, y2: 0, visibility: 'hidden' }, overlay);
     const g = svgEl('g', { id: 'dPts' }, overlay);
-    pts.forEach((p, i) => {
-      // label sits outside the shape, along the local outward normal
+    overlay.classList.toggle('tight', pts.length > 22);
+    // labels sit outside the shape (along the outward normal), then get nudged apart so numbers never overlap
+    const labs = pts.map((p, i) => {
       const a = pts[(i - 1 + pts.length) % pts.length], b = pts[(i + 1) % pts.length];
       let dx = -(b[1] - a[1]), dy = b[0] - a[0];
       if (dx * (p[0] - cx) + dy * (p[1] - cy) < 0) { dx = -dx; dy = -dy; }
-      const L = Math.hypot(dx, dy) || 1;
+      const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+      return { x: p[0] + dx * 34, y: p[1] + dy * 34, nx: dx, ny: dy };
+    });
+    const minGap = pts.length > 22 ? 31 : 36, n = labs.length;
+    for (let it = 0; it < 30; it++) { // numbers push each other apart, stay off the dots, and stay near their own dot
+      let moved = false;
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          let dx = labs[j].x - labs[i].x, dy = labs[j].y - labs[i].y, d = Math.hypot(dx, dy);
+          if (d < minGap) {
+            if (d < 0.01) { dx = labs[j].nx; dy = labs[j].ny; d = 1; }
+            const push = (minGap - d) / 2 + 0.5; labs[i].x -= (dx / d) * push; labs[i].y -= (dy / d) * push; labs[j].x += (dx / d) * push; labs[j].y += (dy / d) * push; moved = true;
+          }
+        }
+      }
+      for (let i = 0; i < n; i++) {
+        for (let k = 0; k < n; k++) {
+          const dx = labs[i].x - pts[k][0], dy = labs[i].y - pts[k][1], d = Math.hypot(dx, dy);
+          if (d < 23) { const push = 23 - d; labs[i].x += (d ? dx / d : labs[i].nx) * push; labs[i].y += (d ? dy / d : labs[i].ny) * push; moved = true; }
+        }
+        const dx = labs[i].x - pts[i][0], dy = labs[i].y - pts[i][1], d = Math.hypot(dx, dy);
+        if (d > 60) { labs[i].x = pts[i][0] + (dx / d) * 60; labs[i].y = pts[i][1] + (dy / d) * 60; }
+      }
+      if (!moved) break;
+    }
+    pts.forEach((p, i) => {
       const dg = svgEl('g', { class: 'dot', id: 'd' + i }, g);
       svgEl('circle', { class: 'halo', cx: p[0], cy: p[1], r: 30 }, dg);
       svgEl('circle', { class: 'core', cx: p[0], cy: p[1], r: 11 }, dg);
-      const tx = svgEl('text', { x: Math.round(p[0] + (dx / L) * 36), y: Math.round(p[1] + (dy / L) * 36 + 10), 'text-anchor': 'middle' }, dg);
+      const tx = svgEl('text', { x: Math.round(labs[i].x), y: Math.round(labs[i].y + 10), 'text-anchor': 'middle' }, dg);
       tx.textContent = i + 1;
     });
     markNext();
@@ -667,7 +890,7 @@
   $('#colorItBtn').addEventListener('click', () => {
     const pts = DS.pts, d = 'M' + pts.map((p) => p.join(' ')).join('L') + 'Z', id = DS.id;
     const shapes = [[d, 'w', 1]].concat(ART.DOTS[id].extras);
-    sfx.pick(); startWork('color', { shapes, lineLevel: 1 });
+    sfx.pick(); startWork('color', { shapes, lineLevel: 1, nav: 'replace' });
     setBanner('🎨', t('fillHint')); say(t('fillHint'));
   });
 
@@ -679,7 +902,7 @@
     const gc = $('#guideCrayon'); if (gc) gc.classList.add('hidden');
   }
   function startLesson(id) {
-    startWork('lesson'); LS.id = id; LS.step = 0; LS.done = false;
+    startWork('lesson', { lessonId: id }); LS.id = id; LS.step = 0; LS.done = false; markTried(id);
     LS.steps = LESSONS[id].steps.concat([{ k: 'color', d: [] }]);
     $('#nextStep').classList.remove('hidden'); renderStep();
   }
@@ -694,7 +917,8 @@
     setBanner(L.emoji, t('step', { n: LS.step + 1, total: n }) + ' · ' + txt);
     let speak = txt; if (LS.step === 0) speak += ' ' + (S.level === 3 ? t('watchIt') : t('traceIt'));
     say(speak);
-    if (st.k === 'color') { WS.tool = 'fill'; renderTools(); }
+    if (st.k === 'color') { WS.tool = 'fill'; if (WS.color === '#2B2B2B') WS.color = '#FF6FB5'; renderPalette(); renderTools(); }
+    $('#skipStep').style.visibility = st.k === 'color' ? 'hidden' : 'visible';
     if (S.level === 1) {
       L.steps.slice(0, LS.step).forEach((ps) => ps.d.forEach((d) => svgEl('path', { d: pd(d), class: 'guide prev' }, overlay)));
     }
@@ -725,13 +949,18 @@
     const L = { steps: LS.steps };
     if (LS.step >= L.steps.length - 1) {
       LS.done = true; stopLessonAnim(); overlay.innerHTML = ''; $('#nextStep').classList.add('hidden');
+      $('#prevStep').style.visibility = 'hidden'; $('#skipStep').style.visibility = 'hidden';
       $('#stepDots').innerHTML = L.steps.map(() => '<i class="done"></i>').join('');
       setBanner('🎉', t('praise')); saveDrawing(true);
       return;
     }
     LS.step++; sfx.pick(); renderStep();
   });
-  $('#prevStep').addEventListener('click', () => { if (LS.step > 0) { LS.step--; sfx.undo(); $('#nextStep').classList.remove('hidden'); renderStep(); } });
+  $('#skipStep').addEventListener('click', () => { // ⏩ show the whole drawing and jump to coloring
+    setLineArt(lessonShapes(LESSONS[LS.id]), 1); LS.step = LS.steps.length - 1; sfx.pick();
+    $('#nextStep').classList.remove('hidden'); renderStep();
+  });
+  $('#prevStep').addEventListener('click', () => { if (LS.step > 0 && !LS.done) { LS.step--; sfx.undo(); $('#nextStep').classList.remove('hidden'); renderStep(); } });
 
 
   // ================= DRAW TOGETHER (copy on paper) =================
@@ -751,23 +980,40 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#paper').classList.contains('active')) wakeOn(); });
   function stopPaperAnim() { if (PV.raf) cancelAnimationFrame(PV.raf); PV.raf = null; const c = $('#paperCrayon'); if (c) c.classList.add('hidden'); }
 
-  function openPaper(id) {
-    PV.id = id; PV.step = -1; PV.rewarded = false; markSeen(id);
-    $('#paperTitle').textContent = LESSONS[id].emoji + ' ' + lessonName(id);
+  function openPaper(id, opts) {
+    opts = opts || {};
+    const L = LESSONS[id];
+    PV.id = id; PV.step = opts.atEnd ? L.steps.length : -1; PV.rewarded = !!opts.atEnd; PV.skipped = !!opts.atEnd;
+    $('#paperTitle').textContent = L.emoji + ' ' + lessonName(id);
     show('paper'); wakeOn();
     requestAnimationFrame(() => { fitPaper(); renderPaper(); });
+    nav('paper', () => restorePaper(id), opts.nav || 'push');
+  }
+  function restorePaper(id) {
+    if (PV.id !== id) { PV.id = id; PV.step = -1; }
+    $('#paperTitle').textContent = LESSONS[id].emoji + ' ' + lessonName(id);
+    show('paper'); wakeOn();
+    requestAnimationFrame(() => { fitPaper(); renderPaper(true); });
+  }
+  function colorLesson(id, navMode) {
+    const L = LESSONS[id];
+    startWork('color', { shapes: lessonShapes(L), lineLevel: 1, lessonId: id, nav: navMode || 'push' });
+    setBanner(L.emoji, lessonName(id) + ' — ' + t('fillHint')); say(t('fillHint'));
   }
   function paperPath(d, cls) { return svgEl('path', { d: pd(d), class: cls + (isK(d) ? ' k' : '') }, pSvg); }
   function setPaperText(big, small, hint) {
     $('#paperText').innerHTML = `<b>${big}</b><span>${small}</span>${hint ? `<em>${hint}</em>` : ''}`;
   }
-  function renderPaper() {
+  function renderPaper(quiet) {
     stopPaperAnim();
     const L = LESSONS[PV.id], n = L.steps.length, s = PV.step, intro = s < 0, end = s >= n;
+    const wasEnd = PV.wasEnd; PV.wasEnd = end; PV.wasEndPrev = wasEnd;
     pSvg.innerHTML = ''; pColor.classList.remove('show');
     $('#paperDots').innerHTML = L.steps.map((_, i) => `<i class="${i < s ? 'done' : i === s ? 'now' : ''}"></i>`).join('');
     $('#paperEnd').classList.toggle('hidden', !end);
     $('#paperNav').classList.toggle('hidden', end);
+    $('#pSkip').classList.toggle('hidden', end);
+    $('#pPhoto').classList.toggle('hidden', !S.photo);
     $('#pBack').style.visibility = intro ? 'hidden' : 'visible';
     $('#pReplay').style.visibility = intro ? 'hidden' : 'visible';
     $('#stepBadge').textContent = intro ? '✏️' : end ? '🎉' : String(s + 1);
@@ -778,22 +1024,25 @@
       L.steps.forEach((st) => st.d.forEach((d) => paperPath(d, 'ink')));
       const big = t('paperIntro', { thing: lessonName(PV.id) });
       setPaperText(big, t('paperIntroSub'));
-      say(big + ' ' + t('paperIntroSub'));
+      PV.lastSay = big + ' ' + t('paperIntroSub'); if (!quiet) say(PV.lastSay);
       return;
     }
     if (end) {
       L.steps.forEach((st) => st.d.forEach((d) => paperPath(d, 'ink')));
+      markTried(PV.id);
       setPaperText(t('doneDrawing'), t('colorYours'));
-      say(t('doneDrawing') + ' ' + t('colorYours'));
+      PV.lastSay = t('doneDrawing') + ' ' + t('colorYours'); if (!quiet) say(PV.lastSay);
+      if (!PV.wasEndPrev) guardTaps(); // a double-tap on ➜ must not hit the end-screen buttons
       setTimeout(showColorIdea, 30);
-      if (!PV.rewarded) { PV.rewarded = true; sfx.tada(); confetti(120); setTimeout(giveSticker, 2200); }
+      if (!PV.rewarded) { PV.rewarded = true; if (!PV.skipped) { sfx.tada(); confetti(120); setTimeout(giveSticker, 1600); } }
       return;
     }
+    if (s === 0) markTried(PV.id);
     L.steps.slice(0, s).forEach((st) => st.d.forEach((d) => paperPath(d, 'ink')));
     const fresh = L.steps[s].d.map((d) => paperPath(d, 'new'));
     const txt = stepText(L.steps[s]);
     setPaperText(t('stepN', { n: s + 1 }) + ' <small>/ ' + n + '</small>', txt, t('copyPink'));
-    say(s === 0 ? txt + ' ' + t('copyPink') : txt);
+    PV.lastSay = s === 0 ? txt + ' ' + t('copyPink') : txt; if (!quiet) say(PV.lastSay);
     animatePaper(fresh);
   }
   function animatePaper(paths) {
@@ -832,8 +1081,20 @@
     const vis = new Uint8Array(N);
     for (const sd of seeds) {
       const sx = sd[0] | 0, sy = sd[1] | 0; if (sx <= 0 || sy <= 0 || sx >= W - 1 || sy >= H - 1) continue;
-      const st = sy * W + sx; if (wall[st] || done[st] || vis[st]) continue;
       const rgb = hexRgb(sd[2]), col = ((255 << 24) | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0]) >>> 0;
+      let st = sy * W + sx;
+      if (wall[st] || (done[st] && px[st] !== col)) {
+        let found = -1;
+        for (let r = 3; r <= 21 && found < 0; r += 3) {
+          for (let q = 0; q < 16; q++) {
+            const xx = Math.round(sx + r * Math.cos(q * Math.PI / 8)), yy = Math.round(sy + r * Math.sin(q * Math.PI / 8));
+            if (xx <= 0 || yy <= 0 || xx >= W - 1 || yy >= H - 1) continue;
+            const k = yy * W + xx; if (!wall[k] && !done[k] && !vis[k]) { found = k; break; }
+          }
+        }
+        if (found < 0) continue;
+        st = found;
+      } else if (done[st] || vis[st]) continue;
       const region = [], stack = [st]; let leak = false; vis[st] = 1;
       while (stack.length) {
         const i = stack.pop(); region.push(i);
@@ -856,36 +1117,144 @@
     }
     return out;
   }
+  function colorIdea(id) { // small cache (each picture is ~4 MB in memory)
+    const c = PV.cache;
+    if (c[id]) { const v = c[id]; delete c[id]; c[id] = v; return v; }
+    const v = colorize(LESSONS[id]); c[id] = v;
+    const keys = Object.keys(c); while (keys.length > 4) delete c[keys.shift()];
+    return v;
+  }
   function showColorIdea() {
     const L = LESSONS[PV.id]; if (!L.colors || !L.colors.length) return;
-    if (!PV.cache[PV.id]) PV.cache[PV.id] = colorize(L);
-    pcx.clearRect(0, 0, W, H); pcx.putImageData(PV.cache[PV.id], 0, 0);
+    pcx.clearRect(0, 0, W, H); pcx.putImageData(colorIdea(PV.id), 0, 0);
     requestAnimationFrame(() => pColor.classList.add('show'));
   }
   $('#pNext').addEventListener('click', () => { sfx.pick(); PV.step++; renderPaper(); });
   $('#pBack').addEventListener('click', () => { if (PV.step > -1) { sfx.undo(); PV.step--; renderPaper(); } });
   $('#pReplay').addEventListener('click', () => { sfx.tap(); renderPaper(); });
   pStage.addEventListener('click', () => { if (PV.step >= 0 && PV.step < LESSONS[PV.id].steps.length) { sfx.tap(); renderPaper(); } });
-  $('#paperSay').addEventListener('click', () => say($('#paperText').textContent));
-  $('#pAgain').addEventListener('click', () => { sfx.pick(); PV.step = 0; renderPaper(); });
+  $('#paperSay').addEventListener('click', () => say(PV.lastSay || $('#paperText').textContent));
+  $('#pAgain').addEventListener('click', () => { sfx.pick(); PV.step = 0; PV.rewarded = false; PV.skipped = false; renderPaper(); });
   $('#pTablet').addEventListener('click', () => { sfx.pick(); startLesson(PV.id); });
-  $('#pPhoto').addEventListener('click', () => { sfx.tap(); $('#photoInput').click(); });
-  $('#photoInput').addEventListener('change', (e) => {
+  $('#pSkip').addEventListener('click', () => { // ⏩ jump straight to the finished drawing
+    const n = LESSONS[PV.id].steps.length; if (PV.step < Math.floor(n / 2)) PV.skipped = true;
+    sfx.pick(); PV.step = n; renderPaper();
+  });
+  $('#pColor').addEventListener('click', () => { sfx.pick(); colorLesson(PV.id); });
+  $('#pPhoto').addEventListener('click', () => { sfx.tap(); openCamera(PV.id); });
+  // ================= CAMERA: "Show me your drawing" =================
+  // Front camera with a 3-2-1 countdown; saves her photo side by side with the intended result.
+  const CAM = { stream: null, id: null, shot: null, busy: false };
+  function refImage(id) {
+    const L = LESSONS[id], c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+    if (L.colors && L.colors.length) {
+      const tc = document.createElement('canvas'); tc.width = W; tc.height = H; tc.getContext('2d').putImageData(colorIdea(id), 0, 0); x.drawImage(tc, 0, 0);
+    }
+    x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = 10; x.strokeStyle = '#3A2A4A'; x.fillStyle = '#3A2A4A';
+    L.steps.forEach((st) => st.d.forEach((d) => { let p; try { p = new Path2D(pd(d)); } catch (e) { return; } if (isK(d)) x.fill(p); x.stroke(p); }));
+    return c;
+  }
+  function camState(mode) {
+    $('#camVideo').classList.toggle('hidden', mode !== 'live');
+    $('#camShot').classList.toggle('hidden', mode !== 'shot');
+    $('#camSnap').classList.toggle('hidden', mode !== 'live');
+    $('#camApp').classList.toggle('hidden', mode !== 'fallback');
+    $('#camRetake').classList.toggle('hidden', mode !== 'shot');
+    $('#camKeep').classList.toggle('hidden', mode !== 'shot');
+    $('#camCount').textContent = '';
+  }
+  function openCamera(id) {
+    CAM.id = id; CAM.shot = null; CAM.busy = false;
+    const rc = $('#camRef'), rx = rc.getContext('2d'); rx.clearRect(0, 0, rc.width, rc.height); rx.drawImage(refImage(id), 0, 0, rc.width, rc.height);
+    camState('live'); $('#camText').textContent = t('camHold');
+    $('#camera').classList.remove('hidden'); say(t('camHold'));
+    ovOpen(); startStream();
+  }
+  function startStream() {
+    const md = navigator.mediaDevices;
+    if (!md || !md.getUserMedia) { camFallback(); return; }
+    md.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false })
+      .then((st) => {
+        if ($('#camera').classList.contains('hidden')) { st.getTracks().forEach((tr) => tr.stop()); return; }
+        CAM.stream = st; const v = $('#camVideo'); v.srcObject = st; const pl = v.play(); if (pl && pl.catch) pl.catch(() => {});
+        if (CAM.wantSnap) { CAM.wantSnap = false; setTimeout(startCountdown, 400); }
+      })
+      .catch(() => camFallback());
+  }
+  function camFallback() { camState('fallback'); $('#camText').textContent = t('camNo'); }
+  function stopStream() {
+    if (CAM.stream) { CAM.stream.getTracks().forEach((tr) => { try { tr.stop(); } catch (e) { /* ignore */ } }); CAM.stream = null; }
+    const v = $('#camVideo'); if (v) { try { v.srcObject = null; } catch (e) { /* ignore */ } }
+  }
+  function closeCamera(silent) {
+    const wasOpen = !$('#camera').classList.contains('hidden');
+    stopStream(); CAM.busy = false; CAM.wantSnap = false; $('#camera').classList.add('hidden');
+    if (wasOpen && !silent) ovRelease();
+  }
+  function takeShot() {
+    const v = $('#camVideo'), c = $('#camShot'), vw = v.videoWidth || 1280, vh = v.videoHeight || 960;
+    c.width = vw; c.height = vh; c.getContext('2d').drawImage(v, 0, 0, vw, vh);
+    CAM.shot = c; const f = $('#camFlash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+    tone(1300, 0.08, 'square', 0.07); stopStream(); camState('shot');
+    $('#camText').textContent = t('camWow'); say(t('camWow')); confetti(60);
+  }
+  $('#camSnap').addEventListener('click', () => {
+    if (!CAM.stream) { CAM.wantSnap = true; $('#camCount').textContent = '⏳'; return; }
+    startCountdown();
+  });
+  function startCountdown() {
+    if (CAM.busy || !CAM.stream) return; CAM.busy = true; let n = 3; const cnt = $('#camCount');
+    const tick = () => {
+      if ($('#camera').classList.contains('hidden') || !CAM.stream) { CAM.busy = false; cnt.textContent = ''; return; }
+      if (n > 0) { cnt.textContent = n; tone(600 + (3 - n) * 140, 0.16, 'sine', 0.18); n--; setTimeout(tick, 800); return; }
+      cnt.textContent = ''; CAM.busy = false; takeShot();
+    };
+    tick();
+  }
+  $('#camRetake').addEventListener('click', () => { sfx.tap(); CAM.shot = null; camState('live'); $('#camText').textContent = t('camHold'); startStream(); });
+  $('#camClose').addEventListener('click', () => { sfx.tap(); closeCamera(); });
+  $('#camApp').addEventListener('click', () => { sfx.tap(); $('#photoInput').click(); });
+  $('#photoInput').addEventListener('change', (e) => { // camera-app fallback
     const file = e.target.files && e.target.files[0]; e.target.value = '';
     if (!file) return;
     const url = URL.createObjectURL(file), im = new Image();
     im.onload = () => {
-      const sc = Math.min(1, 1000 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+      const sc = Math.min(1, 1280 / Math.max(im.width, im.height)), c = $('#camShot');
       c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc);
       c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-      let data; try { data = c.toDataURL('image/jpeg', 0.8); } catch (er) { return; }
-      addToGallery(data); sfx.tada(); confetti(110); neigh();
-      openModal(`<img class="big" src="${data}" alt=""><h3>${t('photoSaved')}</h3><div class="muted">${t('tapToClose')}</div>`, { tapClose: true, auto: 6000 });
-      setTimeout(() => say(t('photoSaved')), 700);
+      CAM.shot = c; camState('shot'); $('#camText').textContent = t('camWow'); say(t('camWow')); confetti(60);
     };
     im.onerror = () => URL.revokeObjectURL(url);
     im.src = url;
   });
+  function rrPath(x, X, Y, w, h, r) { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+  function sideBySide(shot, ref, id) {
+    const c = document.createElement('canvas'); c.width = 1400; c.height = 760;
+    const x = c.getContext('2d'); x.fillStyle = '#FFF8E6'; x.fillRect(0, 0, 1400, 760);
+    const frame = (img, fx, fy, fw, fh, cover) => {
+      x.save(); rrPath(x, fx, fy, fw, fh, 28); x.clip(); x.fillStyle = '#fff'; x.fillRect(fx, fy, fw, fh);
+      const iw = img.width, ih = img.height, sc = cover ? Math.max(fw / iw, fh / ih) : Math.min(fw / iw, fh / ih), dw = iw * sc, dh = ih * sc;
+      x.drawImage(img, fx + (fw - dw) / 2, fy + (fh - dh) / 2, dw, dh); x.restore();
+      x.lineWidth = 8; x.strokeStyle = '#FFD23F'; rrPath(x, fx, fy, fw, fh, 28); x.stroke();
+    };
+    frame(shot, 40, 100, 640, 480, true); frame(ref, 720, 100, 640, 480, false);
+    const font = (px) => `bold ${px}px Fredoka, "Chalkboard SE", "Comic Sans MS", sans-serif`;
+    x.fillStyle = '#3A2A4A'; x.textAlign = 'center'; x.font = font(44); x.fillText(`${NAME} · ${lessonName(id)}`, 700, 68);
+    x.font = font(34); x.fillText(t('myDrawing'), 360, 636); x.fillText(t('theIdea'), 1040, 636);
+    let dateTxt = ''; try { dateTxt = new Date().toLocaleDateString(S.lang === 'fr' ? 'fr-CA' : 'en-CA', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) { /* ignore */ }
+    x.font = font(26); x.fillStyle = '#9a8aaa'; x.fillText(dateTxt, 700, 716);
+    const out = document.createElement('canvas'); out.width = 1100; out.height = Math.round(760 * 1100 / 1400);
+    out.getContext('2d').drawImage(c, 0, 0, out.width, out.height); return out;
+  }
+  $('#camKeep').addEventListener('click', () => {
+    if (!CAM.shot) return;
+    let url; try { url = sideBySide(CAM.shot, $('#camRef'), CAM.id).toDataURL('image/jpeg', 0.78); } catch (e) { toast('🙈'); return; }
+    const gid = addToGallery(url); markTried(CAM.id, { photo: gid });
+    sfx.tada(); confetti(110); neigh(); toast('⭐ ' + t('photoSaved')); sayLater(t('photoSaved'), 500);
+    closeCamera();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && CAM.stream) closeCamera(); });
 
   // ================= PICKERS =================
   function themeFirst(obj) {
@@ -901,7 +1270,7 @@
     return b;
   }
   const mysteryColors = ['#FF6B6B', '#FFB703', '#4CC9F0', '#8AC926', '#9B5DE5', '#FF6FB5', '#FF8C42', '#2EC4B6'];
-  function showPicker(kind) {
+  function showPicker(kind, navMode) {
     pickerKind = kind; pickerToken++; const cards = $('#cards'); cards.innerHTML = ''; let title = '', i = 0;
     const randomCard = (fn) => cards.appendChild(card('<div class="mystery" style="background:linear-gradient(135deg,#FF6B6B,#FFD23F,#4CC9F0,#9B5DE5)">🎲</div>', t('random'), fn, i++));
     if (kind === 'color') {
@@ -913,6 +1282,13 @@
         drawShapes(x, ART.PAGES[id].shapes(), S.level, LW[S.level - 1] * 1.4, 0.3);
         cards.appendChild(card(c, t('pages.' + id), () => startColor(id), i++));
       });
+      const want = THEME_CAT[S.theme] || 'horses';
+      const more = Object.keys(LESSONS).filter((id) => LESSONS[id].cat === want)
+        .concat(HALLOWEEN_SEASON && want !== 'halloween' ? Object.keys(LESSONS).filter((id) => LESSONS[id].cat === 'halloween') : []).slice(0, 16);
+      if (more.length) {
+        const h = document.createElement('div'); h.className = 'section-title'; h.textContent = '🎨 ' + t('moreToColor'); cards.appendChild(h);
+        more.forEach((id) => cards.appendChild(card(`<div class="thumb paper-thumb">${lessonSvg(id)}</div>`, `${LESSONS[id].emoji} ${lessonName(id)}`, () => colorLesson(id), i++)));
+      }
     } else if (kind === 'dots') {
       title = t('pickDots'); const ids = themeFirst(ART.DOTS);
       randomCard(() => startDots(rnd(ids)));
@@ -922,21 +1298,13 @@
       });
     } else {
       title = t('pickTogether');
-      const thumb = (id, big) => {
-        const L = LESSONS[id];
-        const paths = L.steps.reduce((a, st) => a.concat(st.d), []).map((d) => `<path d="${pd(d)}"${isK(d) ? ' fill="#3A2A4A"' : ''}/>`).join('');
-        return `<div class="thumb paper-thumb${big ? ' big' : ''}">${isNew(id) ? `<b class="new-badge">${t('newBadge')}</b>` : ''}<svg viewBox="0 0 1200 900"><g fill="none" stroke="#3A2A4A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg></div>`;
-      };
-      // today's drawing, featured
-      const tid = drawingOfTheDay(), TL = LESSONS[tid];
-      const feat = card(thumb(tid, true), `<span class="today-tag">🌟 ${t('todayTitle')}</span>${TL.emoji} ${lessonName(tid)}<span class="lvl">${'⭐'.repeat(TL.level)}</span>`, () => openPaper(tid), 0);
-      feat.classList.add('today-card'); cards.appendChild(feat);
+      cards.appendChild(buildTogetherTop());
       const chips = document.createElement('div'); chips.className = 'chips';
       chips.innerHTML = CATS.map((c) => {
         const n = c === 'new' ? Object.keys(LESSONS).filter(isNew).length : 0;
         return `<button data-c="${c}" class="${c === togetherCat ? 'on' : ''}">${CAT_EMOJI[c]} ${t('cat_' + c)}${c === 'new' ? ` <i>${n}</i>` : ''}</button>`;
       }).join('');
-      chips.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; togetherCat = b.dataset.c; sfx.pick(); showPicker('lesson'); });
+      chips.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; togetherCat = b.dataset.c; sfx.pick(); showPicker('lesson', 'none'); });
       cards.appendChild(chips);
       const ids = Object.keys(LESSONS).filter((id) => togetherCat === 'all' || (togetherCat === 'new' ? isNew(id) : LESSONS[id].cat === togetherCat))
         .sort((a, b) => ((isNew(a) ? 0 : 1) - (isNew(b) ? 0 : 1)) || (LESSONS[a].level - LESSONS[b].level) || ((LESSONS[a].cat === 'horses' ? 0 : 1) - (LESSONS[b].cat === 'horses' ? 0 : 1)));
@@ -950,7 +1318,9 @@
           const frag = document.createDocumentFragment();
           for (let n = 0; n < (k === 0 ? 10 : 16) && k < ids.length; n++, k++) {
             const id = ids[k], L = LESSONS[id];
-            frag.appendChild(card(thumb(id), `${L.emoji} ${lessonName(id)}<span class="lvl">${'⭐'.repeat(L.level)}</span>`, () => openPaper(id), i++));
+            const cd = card(togetherThumb(id), `${L.emoji} ${lessonName(id)}<span class="lvl">${'⭐'.repeat(L.level)}</span>`, () => openPaper(id), i++);
+            cd.dataset.id = id; if (!isNew(id)) cd.classList.add('tried');
+            frag.appendChild(cd);
           }
           cards.appendChild(frag);
           if (k < ids.length) setTimeout(batch, 16);
@@ -959,8 +1329,49 @@
       }
     }
     $('#pickerTitle').textContent = title; show('picker');
+    nav('picker', () => restorePicker(kind), navMode || 'push');
   }
   $('#pickerSay').addEventListener('click', () => say($('#pickerTitle').textContent));
+  const togetherBadge = (id) => (isNew(id) ? `<b class="new-badge">${t('newBadge')}</b>` : '<i class="done-badge">✓</i>');
+  const togetherThumb = (id, big) => `<div class="thumb paper-thumb${big ? ' big' : ''}">${togetherBadge(id)}${lessonSvg(id)}</div>`;
+  function buildTogetherTop() {
+    const tid = drawingOfTheDay(), TL = LESSONS[tid];
+    const feat = card(togetherThumb(tid, true), `<span class="today-tag">🌟 ${t('todayTitle')}</span>${TL.emoji} ${lessonName(tid)}<span class="lvl">${'⭐'.repeat(TL.level)}</span>`, () => openPaper(tid), 0);
+    feat.classList.add('today-card'); feat.dataset.id = tid;
+    // 🕘 recently done (her photo or colored version when she made one)
+    const all = Object.keys(LESSONS), nTried = all.filter((id) => tried[id]).length;
+    const recent = all.filter((id) => tried[id]).sort((a, b) => tried[b].t - tried[a].t).slice(0, 12);
+    const top = document.createElement('div'); top.className = 'top-row' + (recent.length ? '' : ' solo'); top.appendChild(feat);
+    if (recent.length) {
+      const inGal = {}; getGallery().forEach((g) => { inGal[g.id] = 1; });
+      const mini = (id) => {
+        const r = tried[id], gid = (r.photo && inGal[r.photo] && r.photo) || (r.img && inGal[r.img] && r.img);
+        return `<button class="mini" data-id="${id}"><span class="mini-img">${gid ? `<img data-gid="${gid}" alt="">` : lessonSvg(id)}</span><span class="mini-name">${LESSONS[id].emoji} ${lessonName(id)}</span><i class="done-badge">✓</i></button>`;
+      };
+      const rs = document.createElement('div'); rs.className = 'recent';
+      rs.innerHTML = `<div class="recent-head"><b>🕘 ${t('recentDone')}</b><span class="progress">✓ ${t('triedCount', { n: nTried, total: all.length })}</span></div><div class="recent-strip">${recent.map(mini).join('')}</div>`;
+      rs.addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) { sfx.pick(); openPaper(b.dataset.id, { atEnd: true }); } });
+      fillImgs(rs); top.appendChild(rs);
+    }
+    return top;
+  }
+  function refreshTogether() {
+    const cards = $('#cards');
+    cards.querySelectorAll('.card[data-id]').forEach((cd) => {
+      const id = cd.dataset.id, th = cd.querySelector('.thumb'); if (!th || !LESSONS[id]) return;
+      const old = th.querySelector('.new-badge, .done-badge'); if (old) old.remove();
+      th.insertAdjacentHTML('afterbegin', togetherBadge(id));
+      if (!cd.classList.contains('today-card')) cd.classList.toggle('tried', !isNew(id));
+    });
+    const top = cards.querySelector('.top-row'); if (top) top.replaceWith(buildTogetherTop());
+    const nb = cards.querySelector('.chips button[data-c="new"] i'); if (nb) nb.textContent = Object.keys(LESSONS).filter(isNew).length;
+  }
+  function restorePicker(kind) {
+    if (pickerKind === kind && $('#cards').children.length) {
+      show('picker'); if (kind === 'lesson') refreshTogether();
+      const y = pickScroll; requestAnimationFrame(() => { $('#cards').scrollTop = y; });
+    } else showPicker(kind, 'none');
+  }
   function startColor(id) {
     const pg = ART.PAGES[id];
     startWork('color', { shapes: pg.shapes(), lineLevel: S.level });
@@ -969,32 +1380,38 @@
   }
 
   // ================= SURPRISE SPINNER =================
-  let spinning = false, spinResult = null;
+  let spinning = false, spinResult = null, spinTimers = [], spinToken = 0;
+  function clearSpinTimers() { spinTimers.forEach((x) => { clearTimeout(x); clearInterval(x); }); spinTimers = []; spinning = false; spinToken++; $$('#reels .reel').forEach((r) => r.classList.remove('spinning')); }
   const reelKinds = () => (S.level === 1 ? ['who', 'where'] : S.level === 2 ? ['who', 'doing', 'where'] : ['who', 'doing', 'where', 'bonus']);
   function pool(k) {
-    if (k === 'doing') return SPIN.doing; if (k === 'bonus') return SPIN.bonus;
+    if (k === 'doing') { const dt = (SPIN.doingTheme && SPIN.doingTheme[S.theme]) || []; return SPIN.doing.concat(dt, dt); }
+    if (k === 'bonus') return SPIN.bonus;
     const th = SPIN[k][S.theme] || []; return SPIN[k].base.concat(th, th);
   }
   const word = (item) => fill(item[S.lang === 'fr' ? 2 : 1]);
-  function showSpin() {
-    spinResult = null; $('#drawItBtn').classList.add('hidden'); $('#spinSentence').textContent = '';
+  function showSpin(navMode) {
+    clearSpinTimers(); spinResult = null; $('#drawItBtn').classList.add('hidden'); $('#spinSentence').textContent = '';
     $('#spinBtn').innerHTML = '🎲 ' + t('spin');
     $('#reels').innerHTML = reelKinds().map((k) => `<div class="reel ${k === 'bonus' ? 'bonus' : ''}" data-k="${k}"><div class="re">❓</div><div class="rw"></div></div>`).join('');
     show('spin'); say(t('say_spin'));
+    nav('spin', () => show('spin'), navMode || 'push');
   }
   function doSpin() {
     if (spinning) return; spinning = true; hush();
+    const tok = ++spinToken;
     $('#drawItBtn').classList.add('hidden'); $('#spinSentence').textContent = '';
     const reels = $$('#reels .reel'), picks = [];
     reels.forEach((r, i) => {
       const k = r.dataset.k, P = pool(k); r.classList.remove('landed'); r.classList.add('spinning');
       const iv = setInterval(() => { const it = rnd(P); r.querySelector('.re').textContent = it[0]; r.querySelector('.rw').textContent = word(it); sfx.tick(); }, 90);
-      setTimeout(() => {
-        clearInterval(iv); const it = rnd(P); picks[i] = { k, it };
+      spinTimers.push(iv);
+      spinTimers.push(setTimeout(() => {
+        clearInterval(iv); if (tok !== spinToken) return;
+        const it = rnd(P); picks[i] = { k, it };
         r.querySelector('.re').textContent = it[0]; r.querySelector('.rw').textContent = word(it);
         r.classList.remove('spinning'); r.classList.add('landed'); sfx.ding();
-        if (i === reels.length - 1) setTimeout(() => finishSpin(picks), 350);
-      }, 1000 + i * 650);
+        if (i === reels.length - 1) spinTimers.push(setTimeout(() => { if (tok === spinToken) finishSpin(picks); }, 350));
+      }, 1000 + i * 650));
     });
   }
   function finishSpin(picks) {
@@ -1003,7 +1420,7 @@
     let s = t('drawPrefix') + ' ' + [get('who'), get('doing'), get('where')].filter(Boolean).join(' ') + '!';
     const b = get('bonus'); if (b) s += ' ' + t('bonus') + ' ' + b;
     spinResult = { text: s, emoji: picks.map((p) => p.it[0]).join('') };
-    $('#spinSentence').textContent = s; say(s);
+    $('#spinSentence').textContent = s; if ($('#spin').classList.contains('active')) say(s);
     $('#drawItBtn').classList.remove('hidden'); $('#spinBtn').innerHTML = '🎲 ' + t('again');
   }
   $('#spinBtn').addEventListener('click', doSpin);
@@ -1013,32 +1430,35 @@
   });
 
   // ================= GALLERY =================
-  function showGallery() {
+  function showGallery(navMode) {
     const g = getGallery(), grid = $('#galleryGrid');
     if (!g.length) {
       grid.innerHTML = `<div class="empty">🖼️<br>${t('galleryEmpty')}<br><button class="pill-btn go" id="emptyDraw">🖍️ ${t('act_draw')}</button></div>`;
       $('#emptyDraw').addEventListener('click', () => { sfx.pick(); startDraw(); });
       say(t('galleryEmpty'));
     } else {
-      grid.innerHTML = g.map((d, i) => `<button data-i="${i}"><img src="${d.img}" alt=""></button>`).join('');
+      grid.innerHTML = g.map((d, i) => `<button data-i="${i}"><img data-gid="${d.id}" alt=""></button>`).join('');
+      fillImgs(grid);
       say(t('gallery'));
     }
     show('gallery');
+    nav('gallery', () => showGallery('none'), navMode || 'push');
   }
   $('#galleryGrid').addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (b) { sfx.pick(); openViewer(+b.dataset.i); } });
   function openViewer(i) {
     const d = getGallery()[i]; if (!d) return;
-    openModal(`<img class="big" src="${d.img}" alt=""><div class="row">
-      <button class="pill-btn go" id="vKeep">✏️ ${t('keepDrawing')}</button>
-      <button class="pill-btn" id="vDown">⬇️ ${t('download')}</button>
-      <button class="pill-btn" id="vDel">🗑️</button>
-      <button class="pill-btn" id="vClose">✖</button></div>`);
-    $('#vKeep').addEventListener('click', () => { closeModal(); startWork('draw', { image: d.img }); setBanner('🖍️', t('say_draw')); });
-    $('#vDown').addEventListener('click', () => downloadImg(d.img, d.id));
-    $('#vClose').addEventListener('click', closeModal);
-    $('#vDel').addEventListener('click', () => confirmBox(t('reallyDelete'), () => {
-      const g = getGallery(); g.splice(i, 1); setGallery(g); showGallery();
-    }));
+    galleryImg(d).then((url) => {
+      if (!url) { toast('🙈'); return; }
+      openModal(`<img class="big" src="${url}" alt=""><div class="row">
+        <button class="pill-btn go" id="vKeep">✏️ ${t('keepDrawing')}</button>
+        <button class="pill-btn" id="vDown">⬇️ ${t('download')}</button>
+        <button class="pill-btn" id="vDel">🗑️</button>
+        <button class="pill-btn" id="vClose">✖</button></div>`);
+      $('#vKeep').addEventListener('click', () => closeModal(() => { startWork('draw', { image: url }); setBanner('🖍️', t('say_draw')); }));
+      $('#vDown').addEventListener('click', () => downloadImg(url, d.id));
+      $('#vClose').addEventListener('click', () => closeModal());
+      $('#vDel').addEventListener('click', () => confirmBox(t('reallyDelete'), () => { removeFromGallery(d.id); showGallery('none'); }));
+    });
   }
   function downloadImg(url, id) {
     const dt = new Date(id || Date.now()), stamp = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
@@ -1047,8 +1467,8 @@
   }
   function confirmBox(q, yes) {
     openModal(`<h3>${q}</h3><div class="row"><button class="pill-btn" id="cNo">${t('no')}</button><button class="pill-btn go" id="cYes" style="background:#FF6B6B">${t('yes')}</button></div>`);
-    $('#cNo').addEventListener('click', closeModal);
-    $('#cYes').addEventListener('click', () => { closeModal(); yes(); });
+    $('#cNo').addEventListener('click', () => closeModal());
+    $('#cYes').addEventListener('click', () => closeModal(yes));
   }
 
   // ================= PONY / GROWN-UPS =================
@@ -1057,29 +1477,54 @@
       const p = PONIES[n];
       return `<button data-p="${n}" class="${S.pony === n ? 'on' : ''}" style="--coat:${p.coat};--snout:${p.snout};--mane:${p.mane}">${ART.PONY}<span>${n}</span></button>`;
     }).join('')}</div>`;
-    openModal(html);
+    openModal(html, { onClose: () => { if (!S.pony) { S.pony = 'Caramel'; store.set('pony', S.pony); applyPony(); } } });
     say(t('ponyAsk'));
     $$('.pony-pick button').forEach((b) => b.addEventListener('click', () => {
       S.pony = b.dataset.p; store.set('pony', S.pony); applyPony(); neigh(); closeModal();
       setBubble(t('hello')); jump($('#ponyWrap'));
-      setTimeout(() => say(first ? t('greet') : t('ponyHi')), 500);
+      sayLater(first ? t('greet') : t('ponyHi'), 500);
     }));
   }
+  const esc = (x) => String(x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function openParents() {
     const row = (label, id, on) => `<div class="set-row"><span>${label}</span><button class="pill-btn ${on ? 'on' : ''}" id="${id}">${on ? t('on') : t('off')}</button></div>`;
+    const cur = store.get('voice_' + S.lang, null) ? pickVoice() : null, slow = store.get('voiceRate', 1) < 1;
     openModal(`<h3>👪 ${t('grownups')}</h3>
-      ${row(t('voice'), 'pVoice', S.voice)}${row(t('sounds'), 'pSound', S.sound)}
+      ${row(t('voice'), 'pVoice', S.voice)}
+      <div class="set-row"><span>${t('chooseVoice')}</span><button class="pill-btn" id="pVoicePick">🗣️ ${cur ? esc(cur.name) : t('voiceAuto')}</button></div>
+      <div class="set-row"><span>${t('voiceSpeed')}</span><button class="pill-btn" id="pRate">${slow ? '🐢 ' + t('slow') : '🐇 ' + t('normal')}</button></div>
+      ${row(t('sounds'), 'pSound', S.sound)}
+      ${row(t('photoBtn'), 'pPhotoOpt', S.photo)}
       <div class="set-row"><span>${t('renamePony')}</span><button class="pill-btn" id="pPony">🐴 ${S.pony || ''}</button></div>
       <div class="set-row"><span>${t('wipeGallery')}</span><button class="pill-btn warn" id="pWipeG">🗑️</button></div>
       <div class="set-row"><span>${t('wipeStickers')}</span><button class="pill-btn warn" id="pWipeS">🗑️</button></div>
+      <div class="set-row"><span>${t('wipeTried')}</span><button class="pill-btn warn" id="pWipeT">🗑️</button></div>
       <p class="muted">${t('tipHome')}</p>
       <div class="row"><button class="pill-btn go" id="pClose">${t('close')}</button></div>`);
     $('#pVoice').addEventListener('click', () => { S.voice = !S.voice; store.set('voice', S.voice); if (!S.voice) hush(); openParents(); });
+    $('#pVoicePick').addEventListener('click', openVoicePicker);
+    $('#pRate').addEventListener('click', () => { store.set('voiceRate', slow ? 1 : 0.85); openParents(); say(t('voiceTest'), true); });
     $('#pSound').addEventListener('click', () => { S.sound = !S.sound; store.set('sound', S.sound); updateSoundBtn(); openParents(); });
+    $('#pPhotoOpt').addEventListener('click', () => { S.photo = !S.photo; store.set('photoBtn', S.photo); openParents(); });
     $('#pPony').addEventListener('click', () => ponyPicker(false));
-    $('#pWipeG').addEventListener('click', () => confirmBox(t('wipeGallery') + '?', () => { setGallery([]); toast('✔'); }));
+    $('#pWipeG').addEventListener('click', () => confirmBox(t('wipeGallery') + '?', () => { wipeGallery(); toast('✔'); }));
     $('#pWipeS').addEventListener('click', () => confirmBox(t('wipeStickers') + '?', () => { S.stickers = {}; store.set('stickers', {}); updateStickerNum(); toast('✔'); }));
-    $('#pClose').addEventListener('click', closeModal);
+    $('#pWipeT').addEventListener('click', () => confirmBox(t('wipeTried') + '?', () => { Object.keys(tried).forEach((k) => delete tried[k]); store.set('paperTried', tried); store.set('paperSeen', {}); toast('✔'); }));
+    $('#pClose').addEventListener('click', () => closeModal());
+  }
+  function openVoicePicker() {
+    loadVoices();
+    const list = voicesForLang().slice(0, 16), cur = store.get('voice_' + S.lang, '') || '';
+    const opts = [`<button class="voice-opt ${!cur ? 'on' : ''}" data-v="">✨ ${t('voiceAuto')}</button>`]
+      .concat(list.map((v) => `<button class="voice-opt ${cur === voiceId(v) ? 'on' : ''}" data-v="${esc(voiceId(v))}">${esc(v.name)} <small>${esc(v.lang)}</small></button>`));
+    openModal(`<h3>🗣️ ${t('chooseVoice')}</h3><p class="muted">${list.length ? t('voiceHelp') : t('voiceNone')}</p>
+      <div class="voice-list">${opts.join('')}</div><div class="row"><button class="pill-btn go" id="vpDone">${t('close')}</button></div>`);
+    $$('.voice-opt').forEach((b) => b.addEventListener('click', () => {
+      store.set('voice_' + S.lang, b.dataset.v || null);
+      $$('.voice-opt').forEach((x) => x.classList.toggle('on', x === b));
+      say(t('voiceTest'), true);
+    }));
+    $('#vpDone').addEventListener('click', openParents);
   }
   (function holdToOpen() {
     const b = $('#parentBtn'); let tm = null, opened = false;
@@ -1091,7 +1536,7 @@
   function updateSoundBtn() { $('#soundBtn').textContent = S.sound ? '🔊' : '🔇'; }
 
   // ================= HOME =================
-  function goHome() { hush(); stopLessonAnim(); show('home'); setBubble(t('hello')); updateTodayPill(); }
+  function goHomeView() { hush(); stopLessonAnim(); show('home'); setBubble(t('hello')); updateTodayPill(); }
   function startDraw() { startWork('draw'); setBanner('🖍️', t('say_draw')); say(t('say_draw')); }
   function go(act) {
     sfx.tap();
@@ -1102,7 +1547,7 @@
     say(t('say_' + act));
   }
   $$('.tile').forEach((b) => b.addEventListener('click', () => go(b.dataset.act)));
-  $$('[data-home]').forEach((b) => b.addEventListener('click', () => { sfx.tap(); goHome(); }));
+  $$('[data-back]').forEach((b) => b.addEventListener('click', navBack));
   $('#themeBtns').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     S.theme = b.dataset.theme; store.set('theme', S.theme); applyTheme(); sfx.ding(); jump($('#ponyWrap'));
@@ -1122,20 +1567,31 @@
   $('#stickerBtn').addEventListener('click', () => { sfx.tap(); showStickers(); });
   $('#galleryBtn').addEventListener('click', () => { sfx.tap(); showGallery(); });
   $('#ellieWrap').addEventListener('click', () => { jump($('#ellieWrap')); sfx.giggle(); const s = t('ellieTap'); setBubble(s); say(s); });
-  $('#ponyWrap').addEventListener('click', () => { jump($('#ponyWrap')); neigh(); const s = t('ponyTap'); setBubble(s); setTimeout(() => say(s), 700); });
+  $('#ponyWrap').addEventListener('click', () => { jump($('#ponyWrap')); neigh(); const s = t('ponyTap'); setBubble(s); sayLater(s, 700); });
 
   $('#goBtn').addEventListener('click', () => {
     audio(); sfx.tada();
-    if (CFG.fullscreen) {
-      const el = document.documentElement, rf = el.requestFullscreen || el.webkitRequestFullscreen;
-      if (rf) { try { const p = rf.call(el); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } }
-    }
+    if (CFG.fullscreen && fsSupported && !isFs()) enterFs();
     show('home'); setBubble(t('hello'));
     if (!S.pony || !PONIES[S.pony]) setTimeout(() => ponyPicker(true), 400);
-    else { neigh(); setTimeout(() => say(t('greet')), 500); }
+    else { neigh(); sayLater(t('greet'), 500); }
   });
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) hush(); });
+
+  // ---------- full screen ----------
+  const fsEl = document.documentElement;
+  const isStandalone = !!(window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches));
+  const fsSupported = !!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen) && !isStandalone;
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  function enterFs() { try { const rf = fsEl.requestFullscreen || fsEl.webkitRequestFullscreen; const pr = rf.call(fsEl); if (pr && pr.catch) pr.catch(() => {}); } catch (e) { /* ignore */ } }
+  function toggleFs() { try { if (isFs()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else enterFs(); } catch (e) { /* ignore */ } }
+  const FS_IN = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="#555" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const FS_OUT = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" fill="none" stroke="#555" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function updFs() { const b = $('#fsBtn'); if (b) b.innerHTML = isFs() ? FS_OUT : FS_IN; }
+  $('#fsBtn').classList.toggle('hidden', !fsSupported);
+  $('#fsBtn').addEventListener('click', () => { sfx.tap(); toggleFs(); });
+  document.addEventListener('fullscreenchange', updFs); document.addEventListener('webkitfullscreenchange', updFs); updFs();
 
   // ================= INIT =================
   (function init() {
@@ -1146,10 +1602,9 @@
     $('#ellieWrap').innerHTML = avatar;
     $('#ponyWrap').innerHTML = ART.PONY;
     $('#splashArt').innerHTML = (CFG.avatarImage ? `<img class="ellie" src="${CFG.avatarImage}" alt="">` : ART.ellieSVG('ellie')) + ART.PONY;
-    $('#workHome').innerHTML = CFG.avatarImage ? `<img src="${CFG.avatarImage}" alt="" style="width:100%;height:100%;object-fit:cover">` : ART.ellieSVG('ellie', '74 66 172 172');
-    applyPony(); applyLang(); applyTheme(); updateSoundBtn();
+    applyPony(); applyLang(); applyTheme(); updateSoundBtn(); navInit(); migrateGallery();
   })();
 
   // test hook (harmless)
-  window.__ellie = { drawingOfTheDay, ORDER, seen, LESSONS, openPaper, PV, colorize, S, WS, startDots, startLesson, startColor, startDraw, showSpin, showGallery, showStickers, showPicker, giveSticker, goHome, DS };
+  window.__ellie = { drawingOfTheDay, ORDER, tried, markTried, colorLesson, openCamera, closeCamera, CAM, LESSONS, openPaper, PV, colorize, S, WS, startDots, startLesson, startColor, startDraw, showSpin, showGallery, showStickers, showPicker, giveSticker, goHomeView, navBack, NAV, pickVoice, voicesForLang, DS };
 })();
